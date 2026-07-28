@@ -1,22 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-        <link rel="stylesheet" href="style.css">
+    <title>Đăng ký WeClass</title>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <div class="container">
-    <div class="card" style="max-width: 400px; margin: 100px auto;">
-        <h2>Đăng Ký WeClass</h2>
-        <input type="email" id="email" placeholder="Email" style="width: 100%">
-        <input type="password" id="password" placeholder="Mật khẩu" style="width: 100%">
-        <button id="btnRegister" style="width: 100%">Đăng Ký</button>
-        <p>Đã có tài khoản? <a href="./login.html">Đăng Nhập</a></p>
+<body style="display: flex; align-items: center; justify-content: center; min-height: 100vh;">
+    <div class="card" style="max-width: 400px; width: 90%;">
+        <div class="logo" style="font-size: 2rem;">We<span>Class</span></div>
+        <p style="color: var(--text-sub);">Tạo tài khoản mới để quản lý lớp học</p>
+        
+        <!-- Lưu ý ID phải chính xác là email, password, btnRegister -->
+        <input type="email" id="email" placeholder="Nhập Email của bạn">
+        <input type="password" id="password" placeholder="Mật khẩu (ít nhất 6 ký tự)">
+        
+        <button id="btnRegister">Đăng ký ngay</button>
+        
+        <p>Đã có tài khoản? <a href="login.html" style="color: var(--primary); text-decoration: none; font-weight: 700;">Đăng nhập</a></p>
     </div>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js"></script>
+
+    <!-- Phải có 2 dòng script này -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
 </body>
 </html>

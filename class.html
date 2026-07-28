@@ -4,64 +4,66 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WeClass - Dashboard</title>
-    <!-- LIÊN KẾT CSS Ở ĐÂY -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <nav>
-        <div class="logo">We<span>Class</span></div>
-        <div class="nav-links">
-            <button id="btnLogout" class="danger">Đăng xuất</button>
+        <a href="#" class="logo">We<span>Class</span></a>
+        
+        <div class="user-menu">
+            <div class="avatar-btn" id="avatarBtn">U</div>
+            
+            <div class="dropdown-content" id="userDropdown">
+                <div class="user-info">
+                    <strong id="userEmailDisplay">user@gmail.com</strong>
+                    <div class="user-email">Tài khoản giáo viên</div>
+                </div>
+                
+                <button class="menu-item" onclick="toggleTheme()">
+                    <span id="themeText">Chế độ Tối 🌙</span>
+                </button>
+                
+                <button id="btnLogout" class="menu-item" style="color: #e11d48;">
+                    Đăng xuất 👋
+                </button>
+            </div>
         </div>
     </nav>
 
     <div class="container">
-        <!-- Khu vực danh sách lớp -->
+        <!-- Danh sách lớp -->
         <div id="class-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                <h2>Danh sách lớp học</h2>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="className" placeholder="Tên lớp mới..." style="margin: 0; width: 250px;">
-                    <button id="btnAddClass">Tạo lớp ngay</button>
+            <div class="card" style="margin-bottom: 2rem; padding: 2rem;">
+                <h2>Chào bạn! 👋</h2>
+                <div style="display: flex; gap: 10px; width: 100%; max-width: 500px;">
+                    <input type="text" id="className" placeholder="Tên lớp mới học...">
+                    <button id="btnAddClass" style="width: auto;">Tạo</button>
                 </div>
             </div>
             <div id="class-list" class="grid"></div>
         </div>
 
-        <!-- Khu vực chi tiết lớp (Học sinh) -->
+        <!-- Chi tiết lớp -->
         <div id="student-section" class="hidden">
-            <div style="margin-bottom: 20px;">
-                <button onclick="showClasses()" class="secondary">⬅ Trở về danh sách</button>
-            </div>
-
-            <div class="student-list-container">
-                <!-- Cột trái: Quản lý & Random -->
-                <div>
-                    <div class="card" style="text-align: center; background: #f1f5f9;">
-                        <h2 id="current-class-title">Lớp ...</h2>
-                        <p style="color: var(--text-sub);">Tính năng gọi tên ngẫu nhiên</p>
-                        <button id="btnRandom" style="width: 100%; font-size: 1.1rem; padding: 1rem;">🎲 Random Học Sinh</button>
-                        <div id="random-result" style="margin-top: 1.5rem; font-size: 1.4rem; color: var(--primary); font-weight: 800;"></div>
-                    </div>
-
-                    <div class="card">
-                        <h3>Thêm học sinh mới</h3>
-                        <input type="text" id="stName" placeholder="Họ và tên">
-                        <input type="text" id="stNumber" placeholder="Số hiệu / STT">
-                        <button id="btnAddStudent" style="width: 100%;">Lưu học sinh</button>
-                    </div>
-                </div>
-
-                <!-- Cột phải: Danh sách học sinh -->
+            <button onclick="showClasses()" style="width: auto; margin-bottom: 1rem; background: var(--border); color: var(--text-main);">← Trở về</button>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div class="card">
-                    <h3>Danh sách học sinh</h3>
-                    <div id="student-list"></div>
+                    <h2 id="current-class-title">Lớp học</h2>
+                    <div id="random-result" style="font-size: 1.5rem; color: var(--primary); font-weight: 800;">🎲 ???</div>
+                    <button id="btnRandom">Gọi tên ngẫu nhiên</button>
+                    <hr style="width: 100%; border: 0; border-top: 1px solid var(--border);">
+                    <input type="text" id="stName" placeholder="Tên học sinh">
+                    <input type="text" id="stNumber" placeholder="STT">
+                    <button id="btnAddStudent">Thêm học sinh</button>
+                </div>
+                <div class="card">
+                    <h3>Danh sách lớp</h3>
+                    <div id="student-list" style="width: 100%;"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- LIÊN KẾT SUPABASE VÀ APP.JS Ở ĐÂY -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
 </body>

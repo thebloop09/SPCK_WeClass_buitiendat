@@ -2,68 +2,56 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WeClass - Dashboard</title>
+    <title>Dashboard - WeClass</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<nav>
-    <div class="nav-left">
-        <a href="us.html" class="logo">We<span>Class</span></a>
-        <div class="nav-links">
-            <a href="class.html" class="active">Lớp học</a>
-            <a href="us.html">Giới thiệu</a>
+    <nav>
+        <div class="nav-left">
+            <a href="us.html" class="logo">We<span>Class</span></a>
+            <div class="nav-links"><a href="class.html" class="active">Lớp học</a><a href="us.html">Giới thiệu</a></div>
         </div>
-    </div>
-    
-    <div class="user-menu">
-        <div class="avatar-btn" id="avatarBtn">U</div>
-        <div class="dropdown-content" id="userDropdown">
-            <div style="padding: 15px; border-bottom: 1px solid var(--border); font-size: 0.8rem; overflow: hidden;">
-                <b id="userEmailDisplay">...</b>
+        <div class="user-menu">
+            <div class="avatar-btn" id="avatarBtn">U</div>
+            <div class="dropdown-content" id="userDropdown">
+                <div class="dropdown-user-info"><b id="userEmailDisplay">...</b></div>
+                <button class="menu-item" onclick="toggleTheme()"><span id="themeText">Chế độ Tối 🌙</span></button>
+                <button class="menu-item" id="btnLogout" style="color:#ef4444">Đăng xuất 👋</button>
             </div>
-            <button class="menu-item" onclick="toggleTheme()">
-                <span id="themeText">Đổi giao diện 🌙</span>
-            </button>
-            <button class="menu-item" id="btnLogout" style="color: #e11d48;">Đăng xuất 👋</button>
         </div>
-    </div>
-</nav>
+    </nav>
 
     <div class="container">
-        <!-- Danh sách lớp -->
         <div id="class-section">
-            <div class="card" style="margin-bottom: 2rem; padding: 2rem;">
-                <h2>Chào bạn! 👋</h2>
-                <div style="display: flex; gap: 10px; width: 100%; max-width: 500px;">
-                    <input type="text" id="className" placeholder="Tên lớp mới học...">
-                    <button id="btnAddClass" style="width: auto;">Tạo</button>
+            <div class="card" style="padding:2rem; margin-bottom:2rem">
+                <h2>Lớp học của bạn 👋</h2>
+                <div style="display:flex; gap:10px; width:100%; max-width:500px">
+                    <input type="text" id="className" placeholder="Tên lớp mới...">
+                    <button id="btnAddClass" style="width:auto">Tạo</button>
                 </div>
             </div>
-            <div id="class-list" class="grid"></div>
+            <div id="class-list" class="grid-classes"></div>
         </div>
 
-        <!-- Chi tiết lớp -->
         <div id="student-section" class="hidden">
-            <button onclick="showClasses()" style="width: auto; margin-bottom: 1rem; background: var(--border); color: var(--text-main);">← Trở về</button>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <button onclick="showClasses()" style="margin-bottom:1rem; background:var(--border); color:var(--text-main); width:auto">← Trở về</button>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px;">
                 <div class="card">
-                    <h2 id="current-class-title">Lớp học</h2>
-                    <div id="random-result" style="font-size: 1.5rem; color: var(--primary); font-weight: 800;">🎲 ???</div>
+                    <h2 id="current-class-title">...</h2>
+                    <div id="random-result" style="font-size:1.6rem; color:var(--primary); font-weight:800; min-height:80px">🎲 ???</div>
                     <button id="btnRandom">Gọi tên ngẫu nhiên</button>
-                    <hr style="width: 100%; border: 0; border-top: 1px solid var(--border);">
+                    <hr style="width:100%; border:0; border-top:1px solid var(--border)">
                     <input type="text" id="stName" placeholder="Tên học sinh">
                     <input type="text" id="stNumber" placeholder="STT">
                     <button id="btnAddStudent">Thêm học sinh</button>
                 </div>
                 <div class="card">
                     <h3>Danh sách lớp</h3>
-                    <div id="student-list" style="width: 100%;"></div>
+                    <div id="student-list" style="width:100%"></div>
                 </div>
             </div>
         </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
 </body>

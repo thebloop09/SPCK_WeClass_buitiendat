@@ -7,28 +7,28 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <nav>
-        <a href="#" class="logo">We<span>Class</span></a>
-        
-        <div class="user-menu">
-            <div class="avatar-btn" id="avatarBtn">U</div>
-            
-            <div class="dropdown-content" id="userDropdown">
-                <div class="user-info">
-                    <strong id="userEmailDisplay">user@gmail.com</strong>
-                    <div class="user-email">Tài khoản giáo viên</div>
-                </div>
-                
-                <button class="menu-item" onclick="toggleTheme()">
-                    <span id="themeText">Chế độ Tối 🌙</span>
-                </button>
-                
-                <button id="btnLogout" class="menu-item" style="color: #e11d48;">
-                    Đăng xuất 👋
-                </button>
-            </div>
+<nav>
+    <div class="nav-left">
+        <a href="us.html" class="logo">We<span>Class</span></a>
+        <div class="nav-links">
+            <a href="class.html" class="active">Lớp học</a>
+            <a href="us.html">Giới thiệu</a>
         </div>
-    </nav>
+    </div>
+    
+    <div class="user-menu">
+        <div class="avatar-btn" id="avatarBtn">U</div>
+        <div class="dropdown-content" id="userDropdown">
+            <div style="padding: 15px; border-bottom: 1px solid var(--border); font-size: 0.8rem; overflow: hidden;">
+                <b id="userEmailDisplay">...</b>
+            </div>
+            <button class="menu-item" onclick="toggleTheme()">
+                <span id="themeText">Đổi giao diện 🌙</span>
+            </button>
+            <button class="menu-item" id="btnLogout" style="color: #e11d48;">Đăng xuất 👋</button>
+        </div>
+    </div>
+</nav>
 
     <div class="container">
         <!-- Danh sách lớp -->

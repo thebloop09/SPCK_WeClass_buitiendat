@@ -179,4 +179,43 @@ if (document.getElementById('btnRandom')) {
     };
 }
 
+// Thêm vào đầu file app.js
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Kiểm tra trạng thái đăng nhập để đổi nút trên Navbar
+    const { data: { user } } = await _supabase.auth.getUser();
+    const authLinks = document.getElementById('authLinks');
+
+    if (user && authLinks) {
+        // Nếu đã đăng nhập, hiện Avatar Dropdown giống class.html
+        authLinks.innerHTML = `
+            <div class="avatar-btn" id="avatarBtn">${user.email[0].toUpperCase()}</div>
+            <div class="dropdown-content" id="userDropdown">
+                <div style="padding: 15px; border-bottom: 1px solid var(--border); font-size: 0.8rem; overflow: hidden;">
+                    <b>${user.email}</b>
+                </div>
+                <button class="menu-item" onclick="toggleTheme()">
+                    <span id="themeText">Đổi giao diện 🌙</span>
+                </button>
+                <button class="menu-item" id="btnLogout" style="color: #e11d48;">Đăng xuất 👋</button>
+            </div>
+        `;
+        
+        // Gán lại sự kiện cho nút vừa tạo
+        document.getElementById('avatarBtn').onclick = (e) => {
+            e.stopPropagation();
+            document.getElementById('userDropdown').classList.toggle('show');
+        };
+        document.getElementById('btnLogout').onclick = async () => {
+            await _supabase.auth.signOut();
+            window.location.href = 'login.html';
+        };
+    }
+
+    // Khởi tạo Theme
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeUI(savedTheme);
+});
+
+// Các hàm theme và logic cũ bên dưới giữ nguyên...
 loadClasses();

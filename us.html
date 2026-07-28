@@ -2,35 +2,52 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>WeClass - Giới thiệu</title>
+    <title>Giới thiệu - WeClass</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <nav>
-        <div class="logo">WeClass</div>
-        <div>
-            <a href="us.html">Giới thiệu</a>
-            <a href="login.html">Đăng nhập</a>
+        <div class="nav-left">
+            <a href="us.html" class="logo">We<span>Class</span></a>
+            <div class="nav-links">
+                <a href="class.html">Lớp học</a>
+                <a href="us.html" class="active">Giới thiệu</a>
+            </div>
+        </div>
+        
+        <div class="user-menu" id="authLinks">
+            <!-- Sẽ được thay đổi bằng JavaScript nếu đã đăng nhập -->
+            <button onclick="location.href='login.html'" style="padding: 10px 20px;">Đăng nhập</button>
         </div>
     </nav>
+
     <div class="container">
-        <h1>Chào mừng đến với WeClass</h1>
-        <p>Hệ thống quản lý lớp học thông minh và đơn giản.</p>
-        <div class="grid">
-            <div class="card">
-                <h3>Quản lý lớp</h3>
-                <p>Thêm, xóa và tổ chức danh sách lớp học dễ dàng.</p>
+        <div class="card">
+            <h1>Học tập thật vui 🌈</h1>
+            <p style="max-width: 600px;">WeClass là người bạn đồng hành giúp giáo viên quản lý lớp học một cách nhẹ nhàng, thông minh và tràn đầy cảm hứng.</p>
+            <button onclick="location.href='register.html'">Bắt đầu ngay miễn phí</button>
+        </div>
+
+        <div class="grid-features">
+            <div class="feature-item">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🛡️</div>
+                <h3>Bảo mật</h3>
+                <p>Dữ liệu lớp học của bạn luôn được an toàn.</p>
             </div>
-            <div class="card">
-                <h3>Danh sách học sinh</h3>
-                <p>Lưu trữ tên và số hiệu học sinh chuyên nghiệp.</p>
+            <div class="feature-item">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🎲</div>
+                <h3>Ngẫu nhiên</h3>
+                <p>Gọi tên học sinh công bằng và thú vị hơn.</p>
             </div>
-            <div class="card">
-                <h3>Random số</h3>
-                <p>Tính năng gọi tên/số hiệu ngẫu nhiên để kiểm tra bài cũ.</p>
+            <div class="feature-item">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">📱</div>
+                <h3>Mọi thiết bị</h3>
+                <p>Sử dụng trên điện thoại, máy tính hay máy tính bảng.</p>
             </div>
         </div>
-        <center><button onclick="location.href='register.html'">Bắt đầu ngay</button></center>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
 </body>
 </html>

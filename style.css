@@ -1,7 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-    /* Chế độ Sáng - Màu pastel hiền hòa */
     --primary: #6366f1;
     --bg-body: #f0f2f5;
     --bg-card: #ffffff;
@@ -14,7 +13,6 @@
 }
 
 [data-theme="dark"] {
-    /* Chế độ Tối - Deep Navy mượt mà */
     --bg-body: #0f172a;
     --bg-card: #1e293b;
     --text-main: #f1f5f9;
@@ -26,191 +24,89 @@
 }
 
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+    margin: 0; padding: 0; box-sizing: border-box;
     font-family: 'Plus Jakarta Sans', sans-serif;
-    transition: background 0.3s ease, color 0.3s ease, transform 0.2s ease;
+    transition: background 0.3s ease, color 0.3s ease;
 }
 
-body {
-    background-color: var(--bg-body);
-    color: var(--text-main);
-}
+body { background-color: var(--bg-body); color: var(--text-main); }
 
-/* --- Navbar tròn trịa --- */
+/* --- Navbar Mới (Giống ảnh bạn gửi) --- */
 nav {
-    position: sticky;
-    top: 15px;
-    margin: 0 20px;
-    z-index: 1000;
-    background: var(--nav-bg);
-    backdrop-filter: blur(15px);
-    height: 65px;
-    padding: 0 25px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-radius: 50px; /* Bo tròn cực đại cho nav */
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
+    position: sticky; top: 15px; margin: 0 20px; z-index: 1000;
+    background: var(--nav-bg); backdrop-filter: blur(15px);
+    height: 65px; padding: 0 30px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-radius: 50px; border: 1px solid var(--border); box-shadow: var(--shadow);
 }
 
-.logo {
-    font-size: 1.4rem;
-    font-weight: 800;
-    color: var(--primary);
-    text-decoration: none;
-}
+.nav-left { display: flex; align-items: center; gap: 30px; }
 
-/* --- Dropdown Menu --- */
-.user-menu {
-    position: relative;
-    cursor: pointer;
-}
+.logo { font-size: 1.3rem; font-weight: 800; color: var(--primary); text-decoration: none; }
+.logo span { color: var(--text-main); }
 
+.nav-links { display: flex; gap: 25px; }
+.nav-links a {
+    text-decoration: none; color: var(--text-main);
+    font-weight: 600; font-size: 0.95rem; opacity: 0.7;
+    transition: 0.2s;
+}
+.nav-links a:hover, .nav-links a.active { opacity: 1; color: var(--primary); }
+
+/* --- User Dropdown --- */
+.user-menu { position: relative; cursor: pointer; }
 .avatar-btn {
-    width: 45px;
-    height: 45px;
-    background: var(--primary);
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    border: 3px solid var(--border);
-    font-size: 1.2rem;
+    width: 42px; height: 42px; background: var(--primary); color: white;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; border: 2px solid var(--border);
 }
-
 .dropdown-content {
-    position: absolute;
-    top: 60px;
-    right: 0;
-    background: var(--bg-card);
-    min-width: 240px;
-    border-radius: 25px;
-    padding: 15px;
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border);
-    display: none; /* Ẩn mặc định */
-    flex-direction: column;
-    gap: 10px;
-    z-index: 1001;
+    position: absolute; top: 55px; right: 0; background: var(--bg-card);
+    min-width: 220px; border-radius: 25px; padding: 10px;
+    box-shadow: var(--shadow); border: 1px solid var(--border);
+    display: none; flex-direction: column; z-index: 1001;
 }
-
-.dropdown-content.show {
-    display: flex;
-    animation: slideDown 0.3s ease forwards;
-}
-
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.user-info {
-    padding: 10px;
-    border-bottom: 1px solid var(--border);
-    text-align: center;
-    margin-bottom: 5px;
-}
-
-.user-email {
-    font-size: 0.85rem;
-    color: var(--text-sub);
-    word-break: break-all;
-}
+.dropdown-content.show { display: flex; }
 
 .menu-item {
-    padding: 12px 20px;
-    border-radius: 15px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    text-decoration: none;
-    color: var(--text-main);
-    font-weight: 600;
-    font-size: 0.95rem;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    width: 100%;
+    padding: 12px 18px; border-radius: 15px; border: none;
+    background: transparent; color: var(--text-main);
+    text-align: left; font-weight: 600; cursor: pointer; width: 100%;
 }
+.menu-item:hover { background: var(--input-bg); }
 
-.menu-item:hover {
-    background: var(--input-bg);
-}
-
-/* --- Cards & Buttons --- */
-.container {
-    max-width: 1100px;
-    margin: 4rem auto;
-    padding: 0 20px;
-}
+/* --- Content Layout --- */
+.container { max-width: 1000px; margin: 4rem auto; padding: 0 20px; text-align: center; }
 
 .card {
-    background: var(--bg-card);
-    border-radius: 35px; /* Bo tròn hiền hòa */
-    padding: 3rem 2rem;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.5rem;
+    background: var(--bg-card); border-radius: 40px; padding: 3rem;
+    border: 1px solid var(--border); box-shadow: var(--shadow);
+    display: flex; flex-direction: column; align-items: center; gap: 1.5rem;
 }
 
-input {
-    background: var(--input-bg);
-    color: var(--text-main);
-    padding: 18px;
-    border: 2px solid transparent;
-    border-radius: 25px; /* Tròn trịa */
-    font-size: 15px;
-    width: 100%;
-    text-align: center;
+h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 10px; }
+p { color: var(--text-sub); line-height: 1.6; }
+
+.grid-features {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px; margin-top: 3rem;
 }
 
-input:focus {
-    outline: none;
-    border-color: var(--primary);
+.feature-item {
+    background: var(--bg-card); padding: 2rem; border-radius: 30px;
+    border: 1px solid var(--border); box-shadow: var(--shadow);
 }
 
 button {
-    padding: 16px 30px;
-    border-radius: 25px;
-    border: none;
-    font-weight: 700;
-    cursor: pointer;
-    background: var(--primary);
-    color: white;
-    width: 100%;
+    padding: 16px 30px; border-radius: 30px; border: none;
+    font-weight: 700; cursor: pointer; background: var(--primary); color: white;
 }
 
-button.danger {
-    background: #fff1f2;
-    color: #e11d48;
+input {
+    background: var(--input-bg); color: var(--text-main);
+    padding: 16px; border-radius: 20px; border: 2px solid transparent;
+    width: 100%; text-align: center;
 }
-
-[data-theme="dark"] button.danger {
-    background: rgba(225, 29, 72, 0.1);
-}
-
-/* Layout Grid cho Dashboard */
-.grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 25px;
-}
-
-.class-item {
-    background: var(--bg-card);
-    padding: 2rem;
-    border-radius: 35px;
-    border: 1px solid var(--border);
-    text-align: center;
-}
+input:focus { border-color: var(--primary); outline: none; }
 
 .hidden { display: none; }

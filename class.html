@@ -27,23 +27,23 @@
                 <h2>Lớp học của bạn 👋</h2>
                 <div style="display:flex; gap:10px; width:100%; max-width:500px">
                     <input type="text" id="className" placeholder="Tên lớp mới...">
-                    <button id="btnAddClass" style="width:auto">Tạo</button>
+                    <button id="btnAddClass" style="width:auto" type="button">Tạo</button>
                 </div>
             </div>
             <div id="class-list" class="grid-classes"></div>
         </div>
 
         <div id="student-section" class="hidden">
-            <button onclick="showClasses()" style="margin-bottom:1rem; background:var(--border); color:var(--text-main); width:auto">← Trở về</button>
+            <button onclick="showClasses()" style="margin-bottom:1rem; background:var(--border); color:var(--text-main); width:auto" type="button">← Trở về</button>
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px;">
                 <div class="card">
                     <h2 id="current-class-title">...</h2>
                     <div id="random-result" style="font-size:1.6rem; color:var(--primary); font-weight:800; min-height:80px">🎲 ???</div>
-                    <button id="btnRandom">Gọi tên ngẫu nhiên</button>
+                    <button id="btnRandom" type="button">Gọi tên ngẫu nhiên</button>
                     <hr style="width:100%; border:0; border-top:1px solid var(--border)">
                     <input type="text" id="stName" placeholder="Tên học sinh">
                     <input type="text" id="stNumber" placeholder="STT">
-                    <button id="btnAddStudent">Thêm học sinh</button>
+                    <button id="btnAddStudent" type="button">Thêm học sinh</button>
                 </div>
                 <div class="card">
                     <h3>Danh sách lớp</h3>

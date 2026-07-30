@@ -18,7 +18,7 @@ window.toggleTheme = function() {
     updateThemeUI(theme);
 };
 
-// --- DATA ---
+// --- DATA CLASS ---
 window.loadClasses = async function() {
     if (!window.location.pathname.includes('class.html')) return;
     const { data: { user } } = await _supabase.auth.getUser();
@@ -65,21 +65,13 @@ async function loadStudents() {
         .select('*')
         .eq('class_id', currentClassId);
 
-    if (error) {
-        console.error('Lỗi lấy danh sách học sinh:', error);
-        return;
-    }
+    if (error) return console.error(error);
 
     const list = document.getElementById('student-list');
     if (!list) return;
     list.innerHTML = '';
     
-    // SỬA LỖI SẮP XẾP TẠI ĐÂY: Ép kiểu student_number về dạng Số nguyên để so sánh chính xác (1 < 2 < 10 < 23)
-    currentStudents = (st || []).sort((a, b) => {
-        const numA = parseInt(a.student_number, 10) || 0;
-        const numB = parseInt(b.student_number, 10) || 0;
-        return numA - numB;
-    });
+    currentStudents = (st || []).sort((a, b) => (parseInt(a.student_number, 10) || 0) - (parseInt(b.student_number, 10) || 0));
 
     currentStudents.forEach(s => {
         const points = Number(s.points) || 0;
@@ -88,9 +80,7 @@ async function loadStudents() {
 
         list.innerHTML += `
             <div class="student-item" onclick="openPointModal('${s.id}')">
-                <div class="student-info">
-                    <b>#${s.student_number}</b> ${s.name}
-                </div>
+                <div class="student-info"><b>#${s.student_number}</b> ${s.name}</div>
                 <span class="student-score ${pointClass}">${pointText} điểm</span>
                 <span class="delete-btn" onclick="deleteStudentEvent(event, '${s.id}')">✕</span>
             </div>`;
@@ -99,18 +89,10 @@ async function loadStudents() {
 
 window.deleteStudentEvent = async (event, id) => {
     event.stopPropagation();
-    if (confirm("Bạn có chắc muốn xóa học sinh này?")) {
-        await _supabase.from('students').delete().eq('id', id);
-        loadStudents();
-    }
+    if (confirm("Xóa học sinh này?")) { await _supabase.from('students').delete().eq('id', id); loadStudents(); }
 };
 
-window.deleteStudent = async (id) => { 
-    await _supabase.from('students').delete().eq('id', id); 
-    loadStudents(); 
-};
-
-// --- MODAL CỘNG/TRỪ ĐIỂM ---
+// --- MODAL CỘNG TRỪ ĐIỂM ---
 window.openPointModal = (studentId) => {
     const student = currentStudents.find(s => String(s.id) === String(studentId));
     if (!student) return;
@@ -119,8 +101,7 @@ window.openPointModal = (studentId) => {
     const pointClass = points > 0 ? 'pos' : points < 0 ? 'neg' : '';
     const pointText = points > 0 ? `+${points}` : `${points}`;
 
-    const existing = document.getElementById('pointModalOverlay');
-    if (existing) existing.remove();
+    document.getElementById('pointModalOverlay')?.remove();
 
     const modalHTML = `
         <div id="pointModalOverlay" class="modal-overlay" onclick="closePointModal(event)">
@@ -129,56 +110,119 @@ window.openPointModal = (studentId) => {
                 <div class="modal-left">
                     <div class="st-number">#${student.student_number}</div>
                     <div class="st-name">${student.name}</div>
-                    <div class="st-points ${pointClass}">Điểm hiện tại: <b>${pointText}</b></div>
+                    <div class="st-points ${pointClass}">Điểm: <b>${pointText}</b></div>
                 </div>
                 <div class="modal-right">
                     <button class="btn-point btn-sub" onclick="promptPointUpdate('${student.id}', -1)">-</button>
                     <button class="btn-point btn-add" onclick="promptPointUpdate('${student.id}', 1)">+</button>
                 </div>
             </div>
-        </div>
-    `;
-
+        </div>`;
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 };
 
 window.closePointModal = (e) => {
     if (!e || e.target.id === 'pointModalOverlay' || e.target.classList.contains('close-modal-btn')) {
-        const modal = document.getElementById('pointModalOverlay');
-        if (modal) modal.remove();
+        document.getElementById('pointModalOverlay')?.remove();
     }
 };
 
 window.promptPointUpdate = async (studentId, type) => {
-    const actionText = type === 1 ? 'CỘNG' : 'TRỪ';
-    const input = prompt(`Nhập số điểm muốn ${actionText}:`);
-    
-    if (input === null || input.trim() === '') return;
+    const input = prompt(`Nhập số điểm muốn ${type === 1 ? 'CỘNG' : 'TRỪ'}:`);
+    if (!input || isNaN(parseInt(input, 10))) return;
 
     const amount = parseInt(input, 10);
-    if (isNaN(amount) || amount <= 0) {
-        alert('Vui lòng nhập số nguyên dương hợp lệ!');
-        return;
-    }
-
     const student = currentStudents.find(s => String(s.id) === String(studentId));
-    if (!student) return;
+    const newPoints = (Number(student.points) || 0) + (type === 1 ? amount : -amount);
 
-    const currentPoints = Number(student.points) || 0;
-    const newPoints = type === 1 ? currentPoints + amount : currentPoints - amount;
-
-    const { error } = await _supabase
-        .from('students')
-        .update({ points: newPoints })
-        .eq('id', studentId);
-
-    if (error) {
-        alert('Lỗi cập nhật điểm!\n\nHướng dẫn tạo cột points:\nVào Supabase -> Table Editor -> Bảng "students" -> Thêm cột tên "points", kiểu dữ liệu "int8", giá trị mặc định là 0.');
-    } else {
-        closePointModal();
-        loadStudents();
-    }
+    await _supabase.from('students').update({ points: newPoints }).eq('id', studentId);
+    closePointModal();
+    loadStudents();
 };
+
+// --- PHẦN XỬ LÝ THỜI KHÓA BIỂU (TKB) ---
+function renderEmptyTables() {
+    const schoolTbody = document.querySelector('#table-school tbody');
+    const extraTbody = document.querySelector('#table-extra tbody');
+    if (!schoolTbody || !extraTbody) return;
+
+    schoolTbody.innerHTML = '';
+    for (let slot = 1; slot <= 5; slot++) {
+        let row = `<tr><td class="slot-label">Tiết ${slot}</td>`;
+        for (let day = 2; day <= 7; day++) {
+            row += `<td><input type="text" id="sch_${day}_${slot}" placeholder="Môn học..."></td>`;
+        }
+        row += `</tr>`;
+        schoolTbody.innerHTML += row;
+    }
+
+    extraTbody.innerHTML = '';
+    for (let slot = 1; slot <= 2; slot++) {
+        let row = `<tr><td class="slot-label">Ca ${slot}</td>`;
+        for (let day = 2; day <= 7; day++) {
+            row += `<td>
+                <input type="text" class="time-input" id="ext_time_${day}_${slot}" placeholder="Giờ (vd: 17h-19h)">
+                <input type="text" id="ext_sub_${day}_${slot}" placeholder="Môn / Lớp...">
+            </td>`;
+        }
+        row += `</tr>`;
+        extraTbody.innerHTML += row;
+    }
+}
+
+async function loadSchedule() {
+    if (!window.location.pathname.includes('tkb.html')) return;
+    renderEmptyTables();
+
+    const { data: { user } } = await _supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: items } = await _supabase.from('schedule').select('*').eq('user_id', user.id);
+    if (!items) return;
+
+    items.forEach(item => {
+        if (item.type === 'school') {
+            const el = document.getElementById(`sch_${item.day}_${item.slot}`);
+            if (el) el.value = item.subject || '';
+        } else if (item.type === 'extra') {
+            const elTime = document.getElementById(`ext_time_${item.day}_${item.slot}`);
+            const elSub = document.getElementById(`ext_sub_${item.day}_${item.slot}`);
+            if (elTime) elTime.value = item.time_val || '';
+            if (elSub) elSub.value = item.subject || '';
+        }
+    });
+}
+
+async function saveSchedule(type) {
+    const { data: { user } } = await _supabase.auth.getUser();
+    if (!user) return alert("Vui lòng đăng nhập!");
+
+    await _supabase.from('schedule').delete().eq('user_id', user.id).eq('type', type);
+
+    const payload = [];
+    const maxSlot = type === 'school' ? 5 : 2;
+
+    for (let slot = 1; slot <= maxSlot; slot++) {
+        for (let day = 2; day <= 7; day++) {
+            if (type === 'school') {
+                const sub = document.getElementById(`sch_${day}_${slot}`)?.value.trim();
+                if (sub) payload.push({ user_id: user.id, type: 'school', day, slot, subject: sub });
+            } else {
+                const timeVal = document.getElementById(`ext_time_${day}_${slot}`)?.value.trim();
+                const sub = document.getElementById(`ext_sub_${day}_${slot}`)?.value.trim();
+                if (timeVal || sub) payload.push({ user_id: user.id, type: 'extra', day, slot, time_val: timeVal, subject: sub });
+            }
+        }
+    }
+
+    if (payload.length > 0) {
+        const { error } = await _supabase.from('schedule').insert(payload);
+        if (error) alert("Lỗi khi lưu: " + error.message);
+        else alert("Lưu Thời Khóa Biểu thành công! ✨");
+    } else {
+        alert("Đã xóa trống lịch biểu!");
+    }
+}
 
 // --- INIT ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -196,14 +240,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.onclick = (e) => { e.stopPropagation(); document.getElementById('userDropdown').classList.toggle('show'); };
             }
             loadClasses();
-        } else if (window.location.pathname.includes('class.html')) {
+            loadSchedule();
+        } else if (window.location.pathname.includes('class.html') || window.location.pathname.includes('tkb.html')) {
             window.location.href = 'login.html';
         }
     });
 
     window.onclick = () => document.getElementById('userDropdown')?.classList.remove('show');
 
-    // Events
     const clickAction = (id, func) => { const el = document.getElementById(id); if(el) el.onclick = func; };
 
     clickAction('btnLogin', async () => {
@@ -220,57 +264,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     clickAction('btnAddClass', async () => {
         const name = document.getElementById('className').value;
-        if (!name) return alert('Vui lòng nhập tên lớp');
+        if (!name) return alert('Nhập tên lớp');
         const { data: { user } } = await _supabase.auth.getUser();
         await _supabase.from('classes').insert([{ name, user_id: user.id }]);
         document.getElementById('className').value = ''; loadClasses();
     });
 
     clickAction('btnAddStudent', async () => {
-        const nameInput = document.getElementById('stName');
-        const numberInput = document.getElementById('stNumber');
-        const name = nameInput.value.trim();
-        const rawNumber = numberInput.value.trim();
+        const name = document.getElementById('stName').value.trim();
+        const rawNumber = document.getElementById('stNumber').value.trim();
+        if (!name || !rawNumber) return alert('Nhập đủ Tên và STT');
 
-        if (!name || !rawNumber) {
-            alert('Vui lòng nhập đầy đủ Tên học sinh và Số thứ tự (STT)!');
-            return;
-        }
-
-        if (!currentClassId) {
-            alert('Không tìm thấy ID lớp học hiện tại!');
-            return;
-        }
-
-        // Chuyển STT sang số nguyên
-        const sttNumber = parseInt(rawNumber, 10);
-        const numberToSave = isNaN(sttNumber) ? rawNumber : sttNumber;
-
-        // Thử chèn có kèm cột points
-        let { error } = await _supabase.from('students').insert([{ 
-            name: name, 
-            student_number: numberToSave, 
-            class_id: currentClassId,
-            points: 0 
-        }]);
-
-        // Nếu bảng Supabase chưa có cột points, thử lại mà không gửi cột points
+        const numberToSave = parseInt(rawNumber, 10) || rawNumber;
+        let { error } = await _supabase.from('students').insert([{ name, student_number: numberToSave, class_id: currentClassId, points: 0 }]);
         if (error && error.message.includes('points')) {
-            const retry = await _supabase.from('students').insert([{ 
-                name: name, 
-                student_number: numberToSave, 
-                class_id: currentClassId 
-            }]);
+            const retry = await _supabase.from('students').insert([{ name, student_number: numberToSave, class_id: currentClassId }]);
             error = retry.error;
         }
 
-        if (error) {
-            alert('Lỗi thêm học sinh: ' + error.message);
-        } else {
-            nameInput.value = ''; 
-            numberInput.value = ''; 
-            loadStudents();
-        }
+        if (error) alert(error.message);
+        else { document.getElementById('stName').value = ''; document.getElementById('stNumber').value = ''; loadStudents(); }
     });
 
     clickAction('btnRandom', () => {
@@ -278,4 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const s = currentStudents[Math.floor(Math.random() * currentStudents.length)];
         document.getElementById('random-result').innerHTML = `<small style="font-weight:400; color:var(--text-sub)">May mắn là:</small><br>${s.name}`;
     });
+
+    clickAction('btnSaveSchool', () => saveSchedule('school'));
+    clickAction('btnSaveExtra', () => saveSchedule('extra'));
 });

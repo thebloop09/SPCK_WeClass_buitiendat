@@ -11,6 +11,7 @@
     --input-bg: #f8fafc;
     --nav-bg: rgba(255, 255, 255, 0.85);
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+    --scrollbar-thumb: #cbd5e1;
 }
 
 [data-theme="dark"] {
@@ -22,6 +23,7 @@
     --input-bg: #1e293b;
     --nav-bg: rgba(15, 23, 42, 0.9);
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    --scrollbar-thumb: #475569;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -107,9 +109,10 @@ nav {
 /* --- Layouts --- */
 .container { max-width: 1100px; margin: 3rem auto; padding: 0 20px; }
 .card {
-    background: var(--bg-card); border-radius: 40px; padding: 3rem 2rem;
+    background: var(--bg-card); border-radius: 40px; padding: 2.5rem 2rem;
     border: 1px solid var(--border); box-shadow: var(--shadow);
     display: flex; flex-direction: column; align-items: center; gap: 1.5rem; text-align: center;
+    height: fit-content;
 }
 
 /* Tính năng hàng ngang */
@@ -184,6 +187,33 @@ button.danger:active {
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
 }
 
+/* --- THANH TRƯỢT RIÊNG CHO DANH SÁCH HỌC SINH --- */
+#student-list {
+    width: 100%;
+    max-height: 460px; /* Giới hạn chiều cao */
+    overflow-y: auto;  /* Hiện thanh cuộn khi danh sách dài */
+    padding-right: 6px; /* Tạo khoảng trống nhỏ cho thanh cuộn */
+}
+
+/* Tùy chỉnh thanh cuộn (Custom Scrollbar) đẹp mắt */
+#student-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#student-list::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+}
+
+#student-list::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 10px;
+}
+
+#student-list::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+}
+
 /* --- Dòng danh sách Học sinh --- */
 .student-item {
     display: flex;
@@ -197,13 +227,12 @@ button.danger:active {
     cursor: pointer;
     border: 1px solid var(--border);
     user-select: none;
-    /* Hiệu ứng thẻ nổi nhẹ */
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
 .student-item:hover {
     border-color: var(--primary);
-    transform: translateY(-3px);
+    transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(99, 102, 241, 0.15);
 }
 
@@ -334,7 +363,6 @@ button.danger:active {
     align-items: center;
 }
 
-/* Nút Cộng (+) và Trừ (-) nổi 3D lớn */
 .btn-point {
     width: 48px;
     height: 48px;

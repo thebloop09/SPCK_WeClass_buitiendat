@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Thời Khóa Biểu - WeClass</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .tkb-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px;
+            margin-top: 1rem;
+        }
+        .tkb-table th {
+            background: var(--primary);
+            color: white;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+        }
+        .tkb-table td {
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 6px;
+            text-align: center;
+            vertical-align: middle;
+        }
+        .tkb-table input {
+            padding: 8px;
+            font-size: 0.88rem;
+            border-radius: 8px;
+            box-shadow: none;
+            border: 1px solid transparent;
+        }
+        .tkb-table input:focus {
+            border-color: var(--primary);
+            background: var(--bg-card);
+        }
+        .time-input {
+            margin-bottom: 4px;
+            font-size: 0.8rem !important;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        .slot-label {
+            font-weight: 700;
+            color: var(--text-sub);
+            width: 80px;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="nav-left">
+            <a href="index.html" class="logo">We<span>Class</span></a>
+            <div class="nav-links">
+                <a href="tkb.html" class="active">Thời khóa biểu</a>
+                <a href="class.html">Lớp học</a>
+                <a href="index.html">Giới thiệu</a>
+            </div>
+        </div>
+        <div class="user-menu">
+            <div class="avatar-btn" id="avatarBtn">U</div>
+            <div class="dropdown-content" id="userDropdown">
+                <div class="dropdown-user-info"><b id="userEmailDisplay">...</b></div>
+                <button class="menu-item" onclick="toggleTheme()"><span id="themeText">Chế độ Tối 🌙</span></button>
+                <button class="menu-item" id="btnLogout" style="color:#ef4444">Đăng xuất 👋</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container" style="max-width: 1200px;">
+        <!-- TKB TRÊN TRƯỜNG -->
+        <div class="card" style="margin-bottom: 2rem; align-items: stretch; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>🏫 Thời Khóa Biểu Trên Trường (5 Tiết)</h2>
+                <button id="btnSaveSchool" type="button" style="width: auto;">Lưu TKB Trường</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="tkb-table" id="table-school">
+                    <thead>
+                        <tr>
+                            <th>Tiết</th>
+                            <th>Thứ 2</th>
+                            <th>Thứ 3</th>
+                            <th>Thứ 4</th>
+                            <th>Thứ 5</th>
+                            <th>Thứ 6</th>
+                            <th>Thứ 7</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Tự động sinh bởi app.js -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TKB DẠY THÊM -->
+        <div class="card" style="align-items: stretch; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>✏️ Lịch Dạy Thêm (2 Ca)</h2>
+                <button id="btnSaveExtra" type="button" style="width: auto;">Lưu Lịch Dạy Thêm</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="tkb-table" id="table-extra">
+                    <thead>
+                        <tr>
+                            <th>Ca</th>
+                            <th>Thứ 2</th>
+                            <th>Thứ 3</th>
+                            <th>Thứ 4</th>
+                            <th>Thứ 5</th>
+                            <th>Thứ 6</th>
+                            <th>Thứ 7</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Tự động sinh bởi app.js -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+</body>
+</html>

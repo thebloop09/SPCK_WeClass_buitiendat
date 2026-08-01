@@ -416,3 +416,584 @@ button.danger:hover {
     .nav-links { gap: 10px; }
     nav { padding: 0 15px; margin: 0 10px; }
 }
+/* ==========================================
+   RESPONSIVE DESIGN (TỐI ƯU CHO MỌI MÀN HÌNH)
+   ========================================== */
+
+/* 1. Tối ưu khung chứa chính & Thẻ Card */
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+/* Fix lỗi tràn viền cho ô input và button */
+input, select, button {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* 2. Responsive cho Thanh Điều Hướng (Navbar) */
+@media (max-width: 768px) {
+/* --- FIX NAVBAR TRÊN MOBILE --- */
+nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 1rem;
+    background: var(--bg-card, #1e293b); /* Hoặc màu nền nav của bạn */
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.nav-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap; /* Tự xuống dòng nếu thiếu chỗ */
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Ẩn bớt hoặc chỉnh nhỏ menu trên màn hình nhỏ dưới 600px */
+@media (max-width: 600px) {
+    nav {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.8rem;
+    }
+
+    .nav-left {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .nav-links {
+        width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto; /* Cho phép vuốt ngang các menu nếu quá dài */
+        white-space: nowrap;
+        padding-bottom: 4px;
+    }
+
+    .nav-links a, .tools-btn {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.6rem;
+    }
+}
+
+    .user-menu {
+        align-self: flex-end;
+        position: absolute;
+        top: 0.8rem;
+        right: 1rem;
+    }
+}
+
+/* 3. Responsive cho Trang Lớp Học & Học Sinh */
+.grid-classes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1.2rem;
+}
+
+#student-section > div {
+    display: grid;
+    grid-template-columns: 320px 1fr; /* Màn hình lớn: Cột công cụ cố định, cột danh sách co giãn */
+    gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    #student-section > div {
+        grid-template-columns: 1fr; /* Màn hình nhỏ (Tablet/Mobile): Tự động xếp chồng dọc */
+    }
+}
+
+/* 4. Responsive cho Thẻ Học Sinh & Thanh Điểm Danh Header */
+.student-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.8rem;
+    gap: 0.5rem;
+}
+
+.student-info {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* Tự động thêm dấu ... nếu tên quá dài trên điện thoại */
+}
+
+/* 5. Responsive cho Modal (Cộng điểm & Hẹn giờ) */
+.modal-overlay {
+    padding: 1rem;
+}
+
+.point-modal-card, .tool-modal-card, .alert-modal-card {
+    width: 100%;
+    max-width: 450px;
+    box-sizing: border-box;
+}
+
+/* ==========================================
+   BỔ SUNG TỐI ƯU RESPONSIVE CHO DI ĐỘNG
+   ========================================== */
+
+/* 1. Sửa lỗi Navbar bị tràn/chồng méo trên điện thoại nhỏ */
+@media (max-width: 600px) {
+    nav {
+        margin: 10px;
+        padding: 8px 15px;
+        height: auto;
+        border-radius: 20px;
+        flex-wrap: wrap;
+    }
+
+    .nav-left {
+        width: 100%;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .nav-links {
+        width: 100%;
+        justify-content: overflow-x-auto;
+        gap: 8px;
+        padding-top: 6px;
+        border-top: 1px solid var(--border);
+    }
+
+    .nav-links a, .tools-btn {
+        font-size: 0.82rem;
+        padding: 4px 6px;
+    }
+
+    .user-menu {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+    }
+
+    /* Modal hiển thị fullwidth phù hợp di động */
+    .tool-modal-card, .point-modal-card, .alert-modal-card {
+        width: 95%;
+        padding: 20px 16px;
+        border-radius: 24px;
+    }
+}
+
+/* 2. Fix khung nhập thông tin tạo Lớp & Học sinh trên màn hình nhỏ */
+@media (max-width: 480px) {
+    #class-section .card div[style*="display:flex"] {
+        flex-direction: column;
+        max-width: 100% !important;
+    }
+
+    #class-section button#btnAddClass {
+        width: 100% !important;
+    }
+
+    /* Căn chỉnh lại Modal cộng/trừ điểm */
+    .point-modal-card {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .modal-left {
+        text-align: center;
+    }
+
+    .modal-right {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* 3. Đảm bảo Bảng Thời khóa biểu (tkb.html) cuộn mượt mà không vỡ giao diện */
+.card > div[style*="overflow-x: auto"] {
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+}
+
+.tkb-table th, .tkb-table td {
+    min-width: 100px; /* Đảm bảo các ô TKB không bị ép quá hẹp */
+}
+/* 6. Responsive cho Bảng Thời Khóa Biểu (Cho phép cuộn ngang mượt trên Mobile) */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 1rem;
+}
+
+table {
+    min-width: 600px; /* Đảm bảo bảng không bị ép méo trên màn hình nhỏ */
+}
+
+/* ==========================================
+   HỌC BẠ ĐIỆN TỬ
+   ========================================== */
+
+.btn-hocba {
+    background: #0ea5e9 !important;
+    color: white !important;
+    padding: 8px 12px !important;
+    border-radius: 14px !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.35) !important;
+    margin-right: 8px;
+    width: auto !important;
+}
+.btn-hocba:hover {
+    background: #0284c7 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(14, 165, 233, 0.45) !important;
+}
+
+.gradebook-modal {
+    position: relative;
+    background: var(--bg-card);
+    width: 95%;
+    max-width: 920px;
+    max-height: 90vh;
+    border-radius: 28px;
+    padding: 24px 20px 20px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    animation: popupAnim 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    overflow: hidden;
+}
+
+.gb-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.gb-st-num {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.gb-st-name {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-main);
+    margin: 2px 0;
+}
+
+.gb-meta {
+    font-size: 0.85rem;
+    color: var(--text-sub);
+}
+
+.gb-attendance-box {
+    display: flex;
+    gap: 12px;
+}
+
+.gb-att-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 18px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    min-width: 72px;
+}
+
+.gb-att-item.present {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+}
+.gb-att-item.absent {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
+[data-theme="dark"] .gb-att-item.present {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.35);
+}
+[data-theme="dark"] .gb-att-item.absent {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.35);
+}
+
+.gb-att-num {
+    font-size: 1.5rem;
+    font-weight: 800;
+}
+.gb-att-item.present .gb-att-num { color: #10b981; }
+.gb-att-item.absent .gb-att-num { color: #ef4444; }
+
+.gb-att-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-sub);
+    margin-top: 2px;
+}
+
+.gb-body {
+    overflow-y: auto;
+    flex: 1;
+    padding-right: 4px;
+    max-height: calc(90vh - 180px);
+}
+
+.gb-body::-webkit-scrollbar { width: 6px; }
+.gb-body::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 10px; }
+
+.gb-subject-block {
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px 14px 10px;
+    margin-bottom: 14px;
+}
+
+.gb-subject-title {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--primary);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed var(--border);
+}
+
+.gb-scores-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.gb-scores-grid.primary {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+}
+
+.gb-scores-grid.secondary {
+    grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+}
+
+.gb-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gb-cell label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-sub);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.gb-input {
+    background: var(--bg-card) !important;
+    border: 1.5px solid var(--border) !important;
+    border-radius: 12px !important;
+    padding: 8px 10px !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    text-align: center !important;
+    width: 100% !important;
+    color: var(--text-main) !important;
+}
+
+.gb-input:focus {
+    border-color: var(--primary) !important;
+    outline: none;
+}
+
+.gb-comment-cell {
+    grid-column: 1 / -1;
+}
+
+.gb-comment {
+    text-align: left !important;
+    resize: vertical;
+    min-height: 48px;
+    font-weight: 500 !important;
+}
+
+.gb-footer {
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+}
+
+.btn-save-gb {
+    background: #10b981 !important;
+    padding: 14px 36px !important;
+    border-radius: 18px !important;
+    font-size: 1rem !important;
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4) !important;
+}
+
+.btn-save-gb:hover {
+    background: #059669 !important;
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.5) !important;
+}
+
+/* Student item: cho phép nút học bạ nằm gọn */
+.student-item {
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+@media (max-width: 600px) {
+    .gradebook-modal {
+        width: 98%;
+        max-height: 95vh;
+        padding: 16px 12px 14px;
+        border-radius: 20px;
+    }
+    .gb-scores-grid.primary,
+    .gb-scores-grid.secondary {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .gb-attendance-box {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    .btn-hocba {
+        font-size: 0.72rem !important;
+        padding: 6px 10px !important;
+    }
+}
+
+/* Select khối lớp */
+select#classGrade:focus {
+    border-color: var(--primary);
+    outline: none;
+    background: var(--bg-card);
+}
+
+/* ===== Học bạ 2 cấp: danh sách môn → bảng điểm ===== */
+.gb-list-modal {
+    max-width: 480px;
+}
+
+.gb-section-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-sub);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 4px 0 10px;
+    text-align: left;
+    width: 100%;
+}
+
+.gb-subject-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.gb-subject-btn {
+    display: flex !important;
+    align-items: center;
+    gap: 12px;
+    width: 100% !important;
+    padding: 14px 16px !important;
+    border-radius: 16px !important;
+    background: var(--input-bg) !important;
+    color: var(--text-main) !important;
+    border: 1.5px solid var(--border) !important;
+    box-shadow: none !important;
+    text-align: left !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.gb-subject-btn:hover {
+    border-color: var(--primary) !important;
+    background: var(--bg-card) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.15) !important;
+}
+
+.gb-sub-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.gb-sub-name {
+    flex: 1;
+    text-align: left;
+}
+
+.gb-sub-arrow {
+    font-size: 1.4rem;
+    color: var(--text-sub);
+    font-weight: 400;
+}
+
+.gb-score-modal {
+    max-width: 560px;
+}
+
+.gb-score-header {
+    width: 100%;
+    text-align: left;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.gb-back-btn {
+    background: var(--input-bg) !important;
+    color: var(--text-main) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: none !important;
+    padding: 8px 14px !important;
+    border-radius: 12px !important;
+    font-size: 0.85rem !important;
+    width: auto !important;
+    margin-bottom: 10px;
+}
+
+.gb-back-btn:hover {
+    border-color: var(--primary) !important;
+    transform: none !important;
+}
+
+.gb-score-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--primary);
+    margin: 0 0 4px;
+}
+
+.gb-score-sub {
+    font-size: 0.85rem;
+    color: var(--text-sub);
+    font-weight: 600;
+}

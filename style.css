@@ -259,11 +259,11 @@ nav {
 .class-actions button { flex: 1; padding: 12px; border-radius: 18px; }
 
 /* --- Inputs --- */
-input {
+input[type="text"], input[type="email"], input[type="password"], input[type="number"] {
     background: var(--input-bg); color: var(--text-main); padding: 16px;
     border-radius: 20px; border: 2px solid transparent; width: 100%; text-align: center; font-size: 1rem;
 }
-input:focus { border-color: var(--primary); outline: none; background: var(--bg-card); }
+input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, input[type="number"]:focus { border-color: var(--primary); outline: none; background: var(--bg-card); }
 
 /* --- Buttons --- */
 button {
@@ -307,7 +307,34 @@ button.danger:hover {
     box-shadow: 0 10px 22px rgba(239, 68, 68, 0.45);
 }
 
-/* --- Student List --- */
+/* --- Student List & Điểm danh UI --- */
+.attendance-header {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    padding: 10px 16px;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 12px;
+}
+
+.attendance-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    user-select: none;
+}
+
+.attendance-checkbox-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--primary);
+}
+
 #student-list {
     width: 100%; max-height: 460px; overflow-y: auto; padding-right: 6px;
 }
@@ -319,7 +346,7 @@ button.danger:hover {
 .student-item {
     display: flex; align-items: center; justify-content: space-between;
     padding: 14px 20px; background: var(--bg-card); border-radius: 22px; margin-bottom: 12px;
-    width: 100%; cursor: pointer; border: 1px solid var(--border); user-select: none;
+    width: 100%; border: 1px solid var(--border); user-select: none;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 .student-item:hover {
@@ -327,7 +354,7 @@ button.danger:hover {
     box-shadow: 0 8px 20px rgba(99, 102, 241, 0.15);
 }
 
-.student-info { display: flex; align-items: center; gap: 12px; font-size: 0.95rem; font-weight: 600; }
+.student-info { display: flex; align-items: center; gap: 12px; font-size: 0.95rem; font-weight: 600; cursor: pointer; flex-grow: 1; text-align: left; }
 .student-score {
     font-weight: 700; font-size: 0.85rem; padding: 5px 14px; border-radius: 14px;
     background: var(--input-bg); color: var(--text-sub); border: 1px solid var(--border);

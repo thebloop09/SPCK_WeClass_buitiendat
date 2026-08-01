@@ -6,6 +6,11 @@ let currentClassId = null;
 let currentStudents = [];
 let currentUser = null;
 
+// --- HÀM TRỢ GIÚP LẤY NGÀY HIỆN TẠI (YYYY-MM-DD) ---
+function getTodayString() {
+    return new Date().toISOString().split('T')[0];
+}
+
 // --- THEME ---
 function updateThemeUI(theme) {
     const el = document.getElementById('themeText');
@@ -108,19 +113,74 @@ async function loadStudents() {
     
     currentStudents = (st || []).sort((a, b) => (parseInt(a.student_number, 10) || 0) - (parseInt(b.student_number, 10) || 0));
 
+    const today = getTodayString();
+    let allChecked = currentStudents.length > 0;
+
     currentStudents.forEach(s => {
         const points = Number(s.points) || 0;
         const pointClass = points > 0 ? 'pos' : points < 0 ? 'neg' : '';
         const pointText = points > 0 ? `+${points}` : `${points}`;
 
+        // Kiểm tra reset điểm danh sau 00:00 (Nếu ngày trong DB khác hôm nay)
+        let isPresent = s.is_present;
+        if (s.attendance_date !== today) {
+            isPresent = false;
+            _supabase.from('students').update({ is_present: false, attendance_date: today }).eq('id', s.id);
+        }
+
+        if (!isPresent) allChecked = false;
+
         list.innerHTML += `
-            <div class="student-item" onclick="openPointModal('${s.id}')">
-                <div class="student-info"><b>#${s.student_number}</b> ${s.name}</div>
-                <span class="student-score ${pointClass}">${pointText} điểm</span>
+            <div class="student-item">
+                <input type="checkbox" 
+                       style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); margin-right: 12px;" 
+                       ${isPresent ? 'checked' : ''} 
+                       onclick="event.stopPropagation(); toggleAttendance('${s.id}', this.checked)" />
+                <div class="student-info" onclick="openPointModal('${s.id}')">
+                    <b>#${s.student_number}</b> ${s.name}
+                </div>
+                <span class="student-score ${pointClass}" onclick="openPointModal('${s.id}')">${pointText} điểm</span>
                 <span class="delete-btn" onclick="deleteStudentEvent(event, '${s.id}')">✕</span>
             </div>`;
     });
+
+    const checkAllBox = document.getElementById('checkAllAttendance');
+    if (checkAllBox) checkAllBox.checked = allChecked;
 }
+
+// Xử lý tick điểm danh từng người
+window.toggleAttendance = async (studentId, isChecked) => {
+    const today = getTodayString();
+    await _supabase.from('students').update({ 
+        is_present: isChecked, 
+        attendance_date: today 
+    }).eq('id', studentId);
+
+    const student = currentStudents.find(s => String(s.id) === String(studentId));
+    if (student) {
+        student.is_present = isChecked;
+        student.attendance_date = today;
+    }
+
+    const checkAllBox = document.getElementById('checkAllAttendance');
+    if (checkAllBox) {
+        checkAllBox.checked = currentStudents.every(s => s.is_present);
+    }
+};
+
+// Xử lý tick điểm danh tất cả
+window.toggleCheckAll = async (isChecked) => {
+    if (!currentStudents.length) return;
+    const today = getTodayString();
+
+    const ids = currentStudents.map(s => s.id);
+    await _supabase.from('students').update({ 
+        is_present: isChecked, 
+        attendance_date: today 
+    }).in('id', ids);
+
+    loadStudents();
+};
 
 window.deleteStudentEvent = async (event, id) => {
     event.stopPropagation();
@@ -519,7 +579,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!name || !rawNumber) return alert('Nhập đủ Tên và STT');
 
         const numberToSave = parseInt(rawNumber, 10) || rawNumber;
-        let { error } = await _supabase.from('students').insert([{ name, student_number: numberToSave, class_id: currentClassId, points: 0 }]);
+        const today = getTodayString();
+        let { error } = await _supabase.from('students').insert([{ name, student_number: numberToSave, class_id: currentClassId, points: 0, is_present: false, attendance_date: today }]);
         if (error && error.message.includes('points')) {
             const retry = await _supabase.from('students').insert([{ name, student_number: numberToSave, class_id: currentClassId }]);
             error = retry.error;

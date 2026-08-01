@@ -60,6 +60,15 @@
                 </div>
                 <div class="card">
                     <h3>Danh sách lớp</h3>
+                    
+                    <!-- THÊM Ô ĐIỂM DANH TẤT CẢ Ở ĐẦU DANH SÁCH -->
+                    <div class="attendance-header">
+                        <label class="attendance-checkbox-label">
+                            <input type="checkbox" id="checkAllAttendance" onchange="toggleCheckAll(this.checked)">
+                            <span><b>Có mặt tất cả</b></span>
+                        </label>
+                    </div>
+
                     <div id="student-list" style="width:100%"></div>
                 </div>
             </div>

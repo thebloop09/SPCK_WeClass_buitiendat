@@ -179,18 +179,54 @@ async function loadStudents() {
     const today = getTodayString();
     let allChecked = currentStudents.length > 0;
 
+    // Đảm bảo mỗi học sinh đều có log điểm danh hôm nay.
+    // Mặc định = vắng (false) nếu chưa từng tick hoặc sang ngày mới.
+    const logsToUpsert = [];
+    const studentUpdates = [];
+
+    currentStudents.forEach(s => {
+        let isPresent = !!s.is_present;
+        if (s.attendance_date !== today) {
+            // Sang ngày mới → reset về vắng
+            isPresent = false;
+            s.is_present = false;
+            s.attendance_date = today;
+            studentUpdates.push(s.id);
+        }
+        // Luôn đảm bảo có bản ghi log cho hôm nay (kể cả khi is_present đã đúng ngày)
+        logsToUpsert.push({
+            student_id: s.id,
+            attendance_date: today,
+            is_present: isPresent
+        });
+        if (!isPresent) allChecked = false;
+    });
+
+    // Cập nhật students sang ngày mới (nếu có)
+    if (studentUpdates.length > 0) {
+        try {
+            await _supabase.from('students')
+                .update({ is_present: false, attendance_date: today })
+                .in('id', studentUpdates);
+        } catch (e) { console.warn('reset attendance_date:', e); }
+    }
+
+    // Upsert log hôm nay cho toàn bộ học sinh (mặc định vắng nếu chưa tick)
+    if (logsToUpsert.length > 0) {
+        try {
+            await _supabase.from('attendance_logs').upsert(
+                logsToUpsert,
+                { onConflict: 'student_id,attendance_date' }
+            );
+        } catch (e) { console.warn('attendance_logs upsert on load:', e); }
+    }
+
     currentStudents.forEach(s => {
         const points = Number(s.points) || 0;
         const pointClass = points > 0 ? 'pos' : points < 0 ? 'neg' : '';
         const pointText = points > 0 ? ('+' + points) : String(points);
 
-        let isPresent = s.is_present;
-        if (s.attendance_date !== today) {
-            isPresent = false;
-            _supabase.from('students').update({ is_present: false, attendance_date: today }).eq('id', s.id);
-        }
-
-        if (!isPresent) allChecked = false;
+        const isPresent = !!s.is_present;
 
         const row = document.createElement('div');
         row.className = 'student-item';
@@ -198,7 +234,7 @@ async function loadStudents() {
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.style.cssText = 'width:20px;height:20px;cursor:pointer;accent-color:var(--primary);margin-right:12px;';
-        cb.checked = !!isPresent;
+        cb.checked = isPresent;
         cb.addEventListener('click', function (e) {
             e.stopPropagation();
             toggleAttendance(String(s.id), cb.checked);
@@ -241,6 +277,22 @@ async function loadStudents() {
 
     const checkAllBox = document.getElementById('checkAllAttendance');
     if (checkAllBox) checkAllBox.checked = allChecked;
+
+    updateAttendanceStats();
+}
+
+// Cập nhật thanh thống kê: Sĩ số | Hiện diện | Vắng
+function updateAttendanceStats() {
+    const total = currentStudents.length;
+    const present = currentStudents.filter(s => !!s.is_present).length;
+    const absent = total - present;
+
+    const elTotal = document.getElementById('statTotal');
+    const elPresent = document.getElementById('statPresent');
+    const elAbsent = document.getElementById('statAbsent');
+    if (elTotal) elTotal.textContent = total;
+    if (elPresent) elPresent.textContent = present;
+    if (elAbsent) elAbsent.textContent = absent;
 }
 
 // Xử lý tick điểm danh từng người + ghi log lịch sử
@@ -270,6 +322,8 @@ window.toggleAttendance = async (studentId, isChecked) => {
     if (checkAllBox) {
         checkAllBox.checked = currentStudents.every(s => s.is_present);
     }
+
+    updateAttendanceStats();
 };
 
 // Xử lý tick điểm danh tất cả
@@ -453,6 +507,66 @@ window.openGradebook = async (studentId) => {
     });
 };
 
+// Parse điểm số: trả về số hoặc null nếu trống/không hợp lệ
+function parseScore(val) {
+    if (val === null || val === undefined) return null;
+    const s = String(val).trim().replace(',', '.');
+    if (s === '') return null;
+    const n = parseFloat(s);
+    return isNaN(n) ? null : n;
+}
+
+// Làm tròn 1 chữ số thập phân
+function round1(n) {
+    return Math.round(n * 10) / 10;
+}
+
+/**
+ * Công thức ĐTB môn học kỳ (cấp 2):
+ * ĐTB_mhk = (ΣĐĐG_tx + 2×ĐĐG_gk + 3×ĐĐG_ck) / (Số bài ĐĐG_tx + 5)
+ * TX keys: mieng, tx1, tx2, tx3
+ */
+function calcSemesterAvg(scores, gkKey, ckKey) {
+    const txKeys = ['mieng', 'tx1', 'tx2', 'tx3'];
+    let sumTx = 0;
+    let countTx = 0;
+    txKeys.forEach(function (k) {
+        const v = parseScore(scores[k]);
+        if (v !== null) {
+            sumTx += v;
+            countTx++;
+        }
+    });
+    const gk = parseScore(scores[gkKey]);
+    const ck = parseScore(scores[ckKey]);
+    // Cần ít nhất có giữa kỳ hoặc cuối kỳ mới tính được
+    if (gk === null && ck === null && countTx === 0) return null;
+    const num = sumTx + (gk !== null ? 2 * gk : 0) + (ck !== null ? 3 * ck : 0);
+    const den = countTx + 5;
+    if (den <= 0) return null;
+    return round1(num / den);
+}
+
+/**
+ * ĐTB cả năm = (ĐTB_hk1 + 2×ĐTB_hk2) / 3
+ */
+function calcYearAvg(dtb1, dtb2) {
+    if (dtb1 === null && dtb2 === null) return null;
+    const a = dtb1 !== null ? dtb1 : 0;
+    const b = dtb2 !== null ? dtb2 : 0;
+    // Nếu thiếu 1 học kỳ thì vẫn tính tạm (có thể chỉnh sau)
+    if (dtb1 === null || dtb2 === null) {
+        // Chỉ hiện khi đủ cả 2 học kỳ
+        return null;
+    }
+    return round1((a + 2 * b) / 3);
+}
+
+function formatAvg(val) {
+    if (val === null || val === undefined) return '—';
+    return val.toFixed(1);
+}
+
 window.openSubjectScores = function (subject) {
     const cache = window._gbCache;
     if (!cache) return;
@@ -484,6 +598,30 @@ window.openSubjectScores = function (subject) {
         String(commentVal).replace(/</g, '&lt;') +
         '</textarea></div>';
 
+    // Ô điểm trung bình tự động (chỉ cấp 2)
+    let avgSection = '';
+    if (!isPrimary) {
+        avgSection =
+            '<div class="gb-avg-section">' +
+            '  <div class="gb-section-label">Điểm trung bình môn (tự động)</div>' +
+            '  <div class="gb-avg-grid">' +
+            '    <div class="gb-avg-box">' +
+            '      <span class="gb-avg-label">ĐTB HK1</span>' +
+            '      <span class="gb-avg-value" id="avgHk1">—</span>' +
+            '    </div>' +
+            '    <div class="gb-avg-box">' +
+            '      <span class="gb-avg-label">ĐTB HK2</span>' +
+            '      <span class="gb-avg-value" id="avgHk2">—</span>' +
+            '    </div>' +
+            '    <div class="gb-avg-box year">' +
+            '      <span class="gb-avg-label">ĐTB cả năm</span>' +
+            '      <span class="gb-avg-value" id="avgYear">—</span>' +
+            '    </div>' +
+            '  </div>' +
+            '  <div class="gb-avg-hint">Công thức: (ΣTX + 2×GK + 3×CK) / (số bài TX + 5) · Cả năm = (HK1 + 2×HK2) / 3</div>' +
+            '</div>';
+    }
+
     const html =
         '<div id="subjectScoreOverlay" class="modal-overlay">' +
         '  <div class="gradebook-modal gb-score-modal" onclick="event.stopPropagation()">' +
@@ -494,6 +632,7 @@ window.openSubjectScores = function (subject) {
         '      <div class="gb-score-sub"></div>' +
         '    </div>' +
         '    <div class="gb-scores-grid ' + (isPrimary ? 'primary' : 'secondary') + '">' + cells + '</div>' +
+        avgSection +
         '    <div class="gb-footer">' +
         '      <button type="button" class="btn-save-gb" id="btnSaveSubjectScore">💾 Lưu điểm môn này</button>' +
         '    </div>' +
@@ -516,6 +655,29 @@ window.openSubjectScores = function (subject) {
     document.getElementById('btnSaveSubjectScore').addEventListener('click', async function () {
         await saveSubjectScores(cache.studentId, subject);
     });
+
+    // Tính ĐTB real-time khi nhập điểm (cấp 2)
+    if (!isPrimary) {
+        function refreshAvgs() {
+            const scores = {};
+            ov.querySelectorAll('.gb-input[data-key]').forEach(function (inp) {
+                scores[inp.getAttribute('data-key')] = inp.value;
+            });
+            const dtb1 = calcSemesterAvg(scores, 'gk1', 'ck1');
+            const dtb2 = calcSemesterAvg(scores, 'gk2', 'ck2');
+            const dtbYear = calcYearAvg(dtb1, dtb2);
+            const el1 = document.getElementById('avgHk1');
+            const el2 = document.getElementById('avgHk2');
+            const elY = document.getElementById('avgYear');
+            if (el1) el1.textContent = formatAvg(dtb1);
+            if (el2) el2.textContent = formatAvg(dtb2);
+            if (elY) elY.textContent = formatAvg(dtbYear);
+        }
+        ov.querySelectorAll('.gb-input').forEach(function (inp) {
+            inp.addEventListener('input', refreshAvgs);
+        });
+        refreshAvgs();
+    }
 };
 
 window.closeSubjectScores = function () {
@@ -528,10 +690,12 @@ window.saveSubjectScores = async function (studentId, subject) {
 
     const inputs = ov.querySelectorAll('.gb-input');
     const payload = [];
+    const scores = {}; // để tính ĐTB
 
     inputs.forEach(function (inp) {
         const key = inp.getAttribute('data-key');
         const value = (inp.value || '').trim();
+        scores[key] = value;
         if (value !== '') {
             payload.push({
                 student_id: studentId,
@@ -542,6 +706,42 @@ window.saveSubjectScores = async function (studentId, subject) {
             });
         }
     });
+
+    // Lưu thêm ĐTB HK1, HK2, cả năm (cấp 2)
+    if (!isPrimaryGrade(currentClassGrade)) {
+        const dtb1 = calcSemesterAvg(scores, 'gk1', 'ck1');
+        const dtb2 = calcSemesterAvg(scores, 'gk2', 'ck2');
+        const dtbYear = calcYearAvg(dtb1, dtb2);
+        const now = new Date().toISOString();
+
+        if (dtb1 !== null) {
+            payload.push({
+                student_id: studentId,
+                subject: subject,
+                score_key: 'dtb_hk1',
+                score_value: dtb1.toFixed(1),
+                updated_at: now
+            });
+        }
+        if (dtb2 !== null) {
+            payload.push({
+                student_id: studentId,
+                subject: subject,
+                score_key: 'dtb_hk2',
+                score_value: dtb2.toFixed(1),
+                updated_at: now
+            });
+        }
+        if (dtbYear !== null) {
+            payload.push({
+                student_id: studentId,
+                subject: subject,
+                score_key: 'dtb_cn',
+                score_value: dtbYear.toFixed(1),
+                updated_at: now
+            });
+        }
+    }
 
     try {
         // Xóa điểm cũ của đúng môn này
@@ -837,7 +1037,10 @@ window.closeAlertModal = function (e) {
 
 function closeToolsMenu() {
     const menu = document.querySelector('.tools-menu');
-    if (menu) menu.classList.remove('show');
+    if (menu) {
+        menu.classList.remove('show');
+        menu.style.display = '';
+    }
 }
 
 // --- INIT APP ---
@@ -944,29 +1147,51 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const numberToSave = parseInt(rawNumber, 10) || rawNumber;
         const today = getTodayString();
-        let { error } = await _supabase.from('students').insert([{
+
+        // Thêm học sinh, mặc định vắng mặt hôm nay
+        let insertRes = await _supabase.from('students').insert([{
             name,
             student_number: numberToSave,
             class_id: currentClassId,
             points: 0,
             is_present: false,
             attendance_date: today
-        }]);
-        if (error && error.message.includes('points')) {
+        }]).select('id').single();
+
+        let error = insertRes.error;
+        let newStudentId = insertRes.data?.id;
+
+        if (error && (error.message || '').includes('points')) {
             const retry = await _supabase.from('students').insert([{
                 name,
                 student_number: numberToSave,
-                class_id: currentClassId
-            }]);
+                class_id: currentClassId,
+                is_present: false,
+                attendance_date: today
+            }]).select('id').single();
             error = retry.error;
+            newStudentId = retry.data?.id;
         }
 
-        if (error) alert(error.message);
-        else {
-            document.getElementById('stName').value = '';
-            document.getElementById('stNumber').value = '';
-            loadStudents();
+        if (error) {
+            alert(error.message);
+            return;
         }
+
+        // Ghi log vắng mặt ngay khi thêm học sinh (để học bạ đếm đúng)
+        if (newStudentId) {
+            try {
+                await _supabase.from('attendance_logs').upsert({
+                    student_id: newStudentId,
+                    attendance_date: today,
+                    is_present: false
+                }, { onConflict: 'student_id,attendance_date' });
+            } catch (e) { console.warn('attendance_logs on add student:', e); }
+        }
+
+        document.getElementById('stName').value = '';
+        document.getElementById('stNumber').value = '';
+        loadStudents();
     });
 
     clickAction('btnRandom', () => {

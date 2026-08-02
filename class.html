@@ -72,6 +72,21 @@
                 <div class="card">
                     <h3>Danh sách lớp</h3>
 
+                    <div id="attendance-stats" class="attendance-stats">
+                        <div class="att-stat">
+                            <span class="att-stat-label">Sĩ số</span>
+                            <span class="att-stat-value" id="statTotal">0</span>
+                        </div>
+                        <div class="att-stat present">
+                            <span class="att-stat-label">Hiện diện</span>
+                            <span class="att-stat-value" id="statPresent">0</span>
+                        </div>
+                        <div class="att-stat absent">
+                            <span class="att-stat-label">Vắng</span>
+                            <span class="att-stat-value" id="statAbsent">0</span>
+                        </div>
+                    </div>
+
                     <div class="attendance-header">
                         <label class="attendance-checkbox-label">
                             <input type="checkbox" id="checkAllAttendance" onchange="toggleCheckAll(this.checked)">

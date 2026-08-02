@@ -1214,3 +1214,70 @@ select#classGrade:focus {
         font-size: 1.15rem;
     }
 }
+/* Styling cho nút và form chỉnh sửa thông tin ở đầu học bạ */
+.btn-edit-st {
+    background: transparent;
+    border: 1px solid var(--border, #ccc);
+    color: var(--text-sub, #666);
+    padding: 3px 10px;
+    font-size: 0.75rem;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-edit-st:hover {
+    background: var(--primary, #007bff);
+    color: #fff;
+    border-color: var(--primary, #007bff);
+}
+
+.gb-edit-input {
+    border: 1px solid var(--border, #ccc);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.88rem;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.gb-edit-input:focus {
+    border-color: var(--primary, #007bff);
+}
+
+.btn-gb-save {
+    background: #28a745;
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.btn-gb-save:hover {
+    background: #218838;
+}
+
+.btn-gb-cancel {
+    background: #dc3545;
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.btn-gb-cancel:hover {
+    background: #c82333;
+}

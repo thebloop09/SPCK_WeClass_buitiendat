@@ -183,21 +183,17 @@ async function loadStudents() {
     const today = getTodayString();
     let allChecked = currentStudents.length > 0;
 
-    // Đảm bảo mỗi học sinh đều có log điểm danh hôm nay.
-    // Mặc định = vắng (false) nếu chưa từng tick hoặc sang ngày mới.
     const logsToUpsert = [];
     const studentUpdates = [];
 
     currentStudents.forEach(s => {
         let isPresent = !!s.is_present;
         if (s.attendance_date !== today) {
-            // Sang ngày mới → reset về vắng
             isPresent = false;
             s.is_present = false;
             s.attendance_date = today;
             studentUpdates.push(s.id);
         }
-        // Luôn đảm bảo có bản ghi log cho hôm nay (kể cả khi is_present đã đúng ngày)
         logsToUpsert.push({
             student_id: s.id,
             attendance_date: today,
@@ -206,7 +202,6 @@ async function loadStudents() {
         if (!isPresent) allChecked = false;
     });
 
-    // Cập nhật students sang ngày mới (nếu có)
     if (studentUpdates.length > 0) {
         try {
             await _supabase.from('students')
@@ -215,7 +210,6 @@ async function loadStudents() {
         } catch (e) { console.warn('reset attendance_date:', e); }
     }
 
-    // Upsert log hôm nay cho toàn bộ học sinh (mặc định vắng nếu chưa tick)
     if (logsToUpsert.length > 0) {
         try {
             await _supabase.from('attendance_logs').upsert(
@@ -285,7 +279,7 @@ async function loadStudents() {
     updateAttendanceStats();
 }
 
-// Cập nhật thanh thống kê: Sĩ số | Hiện diện | Vắng
+// Cập nhật thanh thống kê
 function updateAttendanceStats() {
     const total = currentStudents.length;
     const present = currentStudents.filter(s => !!s.is_present).length;
@@ -299,7 +293,7 @@ function updateAttendanceStats() {
     if (elAbsent) elAbsent.textContent = absent;
 }
 
-// Xử lý tick điểm danh từng người + ghi log lịch sử
+// Xử lý tick điểm danh
 window.toggleAttendance = async (studentId, isChecked) => {
     const today = getTodayString();
     await _supabase.from('students').update({
@@ -307,7 +301,6 @@ window.toggleAttendance = async (studentId, isChecked) => {
         attendance_date: today
     }).eq('id', studentId);
 
-    // Ghi log lịch sử (bỏ qua nếu bảng chưa có)
     try {
         await _supabase.from('attendance_logs').upsert({
             student_id: studentId,
@@ -330,7 +323,6 @@ window.toggleAttendance = async (studentId, isChecked) => {
     updateAttendanceStats();
 };
 
-// Xử lý tick điểm danh tất cả
 window.toggleCheckAll = async (isChecked) => {
     if (!currentStudents.length) return;
     const today = getTodayString();
@@ -443,7 +435,6 @@ window.openGradebook = async (studentId) => {
         });
     } catch (e) { console.warn('attendance_logs:', e); }
 
-    // Lưu tạm để mở bảng điểm môn
     window._gbCache = {
         studentId: String(studentId),
         student: student,
@@ -465,6 +456,8 @@ window.openGradebook = async (studentId) => {
             '</button>';
     });
 
+    const phoneDisplay = student.phone ? `<div class="gb-phone" style="font-size:0.85rem; color:var(--text-sub); margin-top:2px;"><i class="fa-solid fa-phone"></i> SĐT: <b>${student.phone}</b></div>` : '';
+
     const modalHTML =
         '<div id="gradebookOverlay" class="modal-overlay">' +
         '  <div class="gradebook-modal gb-list-modal" onclick="event.stopPropagation()">' +
@@ -474,6 +467,7 @@ window.openGradebook = async (studentId) => {
         '        <div class="gb-st-num">#' + (student.student_number || '') + '</div>' +
         '        <h2 class="gb-st-name"></h2>' +
         '        <div class="gb-meta"></div>' +
+        phoneDisplay +
         '      </div>' +
         '      <div class="gb-attendance-box">' +
         '        <div class="gb-att-item present">' +
@@ -511,7 +505,6 @@ window.openGradebook = async (studentId) => {
     });
 };
 
-// Parse điểm số: trả về số hoặc null nếu trống/không hợp lệ
 function parseScore(val) {
     if (val === null || val === undefined) return null;
     const s = String(val).trim().replace(',', '.');
@@ -520,16 +513,10 @@ function parseScore(val) {
     return isNaN(n) ? null : n;
 }
 
-// Làm tròn 1 chữ số thập phân
 function round1(n) {
     return Math.round(n * 10) / 10;
 }
 
-/**
- * Công thức ĐTB môn học kỳ (cấp 2):
- * ĐTB_mhk = (ΣĐĐG_tx + 2×ĐĐG_gk + 3×ĐĐG_ck) / (Số bài ĐĐG_tx + 5)
- * TX keys: mieng, tx1, tx2, tx3
- */
 function calcSemesterAvg(scores, gkKey, ckKey) {
     const txKeys = ['mieng', 'tx1', 'tx2', 'tx3'];
     let sumTx = 0;
@@ -543,7 +530,6 @@ function calcSemesterAvg(scores, gkKey, ckKey) {
     });
     const gk = parseScore(scores[gkKey]);
     const ck = parseScore(scores[ckKey]);
-    // Cần ít nhất có giữa kỳ hoặc cuối kỳ mới tính được
     if (gk === null && ck === null && countTx === 0) return null;
     const num = sumTx + (gk !== null ? 2 * gk : 0) + (ck !== null ? 3 * ck : 0);
     const den = countTx + 5;
@@ -551,16 +537,11 @@ function calcSemesterAvg(scores, gkKey, ckKey) {
     return round1(num / den);
 }
 
-/**
- * ĐTB cả năm = (ĐTB_hk1 + 2×ĐTB_hk2) / 3
- */
 function calcYearAvg(dtb1, dtb2) {
     if (dtb1 === null && dtb2 === null) return null;
     const a = dtb1 !== null ? dtb1 : 0;
     const b = dtb2 !== null ? dtb2 : 0;
-    // Nếu thiếu 1 học kỳ thì vẫn tính tạm (có thể chỉnh sau)
     if (dtb1 === null || dtb2 === null) {
-        // Chỉ hiện khi đủ cả 2 học kỳ
         return null;
     }
     return round1((a + 2 * b) / 3);
@@ -602,7 +583,6 @@ window.openSubjectScores = function (subject) {
         String(commentVal).replace(/</g, '&lt;') +
         '</textarea></div>';
 
-    // Ô điểm trung bình tự động (chỉ cấp 2)
     let avgSection = '';
     if (!isPrimary) {
         avgSection =
@@ -660,7 +640,6 @@ window.openSubjectScores = function (subject) {
         await saveSubjectScores(cache.studentId, subject);
     });
 
-    // Tính ĐTB real-time khi nhập điểm (cấp 2)
     if (!isPrimary) {
         function refreshAvgs() {
             const scores = {};
@@ -694,7 +673,7 @@ window.saveSubjectScores = async function (studentId, subject) {
 
     const inputs = ov.querySelectorAll('.gb-input');
     const payload = [];
-    const scores = {}; // để tính ĐTB
+    const scores = {};
 
     inputs.forEach(function (inp) {
         const key = inp.getAttribute('data-key');
@@ -711,7 +690,6 @@ window.saveSubjectScores = async function (studentId, subject) {
         }
     });
 
-    // Lưu thêm ĐTB HK1, HK2, cả năm (cấp 2)
     if (!isPrimaryGrade(currentClassGrade)) {
         const dtb1 = calcSemesterAvg(scores, 'gk1', 'ck1');
         const dtb2 = calcSemesterAvg(scores, 'gk2', 'ck2');
@@ -748,7 +726,6 @@ window.saveSubjectScores = async function (studentId, subject) {
     }
 
     try {
-        // Xóa điểm cũ của đúng môn này
         await _supabase.from('grades').delete()
             .eq('student_id', studentId)
             .eq('subject', subject);
@@ -756,15 +733,13 @@ window.saveSubjectScores = async function (studentId, subject) {
         if (payload.length > 0) {
             const { error } = await _supabase.from('grades').insert(payload);
             if (error) {
-                alert('Lỗi khi lưu: ' + error.message + '\n\nHãy chắc chắn đã chạy SQL_HOCBA.sql');
+                alert('Lỗi khi lưu: ' + error.message);
                 return;
             }
         }
 
-        // Cập nhật cache
         if (window._gbCache) {
             if (!window._gbCache.gradeMap[subject]) window._gbCache.gradeMap[subject] = {};
-            // reset môn này trong cache rồi ghi lại
             window._gbCache.gradeMap[subject] = {};
             payload.forEach(function (p) {
                 window._gbCache.gradeMap[subject][p.score_key] = p.score_value;
@@ -774,7 +749,7 @@ window.saveSubjectScores = async function (studentId, subject) {
         alert('Đã lưu điểm môn "' + subject + '" thành công!');
         closeSubjectScores();
     } catch (e) {
-        alert('Lỗi: ' + e.message + '\n\nHãy chạy SQL_HOCBA.sql trong Supabase trước.');
+        alert('Lỗi: ' + e.message);
     }
 };
 
@@ -784,7 +759,6 @@ window.closeGradebook = function (e) {
         document.getElementById('gradebookOverlay')?.remove();
     }
 };
-
 
 // --- PHẦN XỬ LÝ THỜI KHÓA BIỂU (TKB) ---
 function renderEmptyTables() {
@@ -1125,7 +1099,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let { error } = await _supabase.from('classes').insert([{ name, user_id: currentUser.id, grade_level: grade }]);
 
-        // Nếu cột grade_level chưa có → thử insert không có cột đó
         if (error && (error.message || '').toLowerCase().includes('grade_level')) {
             const retry = await _supabase.from('classes').insert([{ name, user_id: currentUser.id }]);
             error = retry.error;
@@ -1144,22 +1117,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadClasses();
     });
 
+    // Cập nhật hàm Thêm Học Sinh có xử lý lưu SĐT
     clickAction('btnAddStudent', async () => {
         const name = document.getElementById('stName').value.trim();
         const rawNumber = document.getElementById('stNumber').value.trim();
+        const phone = document.getElementById('stPhone')?.value.trim() || null;
+
         if (!name || !rawNumber) return alert('Nhập đủ Tên và STT');
 
         const numberToSave = parseInt(rawNumber, 10) || rawNumber;
         const today = getTodayString();
 
-        // Thêm học sinh, mặc định vắng mặt hôm nay
         let insertRes = await _supabase.from('students').insert([{
             name,
             student_number: numberToSave,
             class_id: currentClassId,
             points: 0,
             is_present: false,
-            attendance_date: today
+            attendance_date: today,
+            phone: phone
         }]).select('id').single();
 
         let error = insertRes.error;
@@ -1171,7 +1147,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 student_number: numberToSave,
                 class_id: currentClassId,
                 is_present: false,
-                attendance_date: today
+                attendance_date: today,
+                phone: phone
             }]).select('id').single();
             error = retry.error;
             newStudentId = retry.data?.id;
@@ -1182,7 +1159,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // Ghi log vắng mặt ngay khi thêm học sinh (để học bạ đếm đúng)
         if (newStudentId) {
             try {
                 await _supabase.from('attendance_logs').upsert({
@@ -1195,6 +1171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.getElementById('stName').value = '';
         document.getElementById('stNumber').value = '';
+        if (document.getElementById('stPhone')) document.getElementById('stPhone').value = '';
         loadStudents();
     });
 
@@ -1237,3 +1214,193 @@ document.addEventListener('DOMContentLoaded', async () => {
     clickAction('btnSaveSchool', () => saveSchedule('school'));
     clickAction('btnSaveExtra', () => saveSchedule('extra'));
 });
+// --- KHỞI TẠO BIẾN TOÀN CỤC ---
+window._gbCache = null;
+
+// --- HÀM MỞ HỌC BẠ (CÓ NÚT & FORM CHỈNH SỬA Ở ĐẦU) ---
+window.openGradebook = async (studentId) => {
+    const student = currentStudents.find(s => String(s.id) === String(studentId));
+    if (!student) return;
+
+    document.getElementById('gradebookOverlay')?.remove();
+
+    let gradeMap = {};
+    try {
+        const { data: gradeRows } = await _supabase
+            .from('grades')
+            .select('*')
+            .eq('student_id', studentId);
+        (gradeRows || []).forEach(r => {
+            if (!gradeMap[r.subject]) gradeMap[r.subject] = {};
+            gradeMap[r.subject][r.score_key] = r.score_value;
+        });
+    } catch (e) { 
+        console.warn('Lỗi lấy điểm:', e); 
+    }
+
+    let presentCount = 0;
+    let absentCount = 0;
+    try {
+        const { data: logs } = await _supabase
+            .from('attendance_logs')
+            .select('is_present')
+            .eq('student_id', studentId);
+        (logs || []).forEach(l => {
+            if (l.is_present) presentCount++;
+            else absentCount++;
+        });
+    } catch (e) { 
+        console.warn('Lỗi lấy điểm danh:', e); 
+    }
+
+    window._gbCache = {
+        studentId: String(studentId),
+        student: student,
+        gradeMap: gradeMap,
+        presentCount: presentCount,
+        absentCount: absentCount
+    };
+
+    const subjects = getSubjectsForGrade(currentClassGrade);
+    const isPrimary = isPrimaryGrade(currentClassGrade);
+
+    let subjectBtns = '';
+    subjects.forEach((sub, i) => {
+        subjectBtns +=
+            '<button type="button" class="gb-subject-btn" data-subject-idx="' + i + '">' +
+            '<span class="gb-sub-icon"><i class="fa-solid fa-book-open-reader"></i></span>' +
+            '<span class="gb-sub-name">' + sub + '</span>' +
+            '<span class="gb-sub-arrow"><i class="fa-solid fa-chevron-right"></i></span>' +
+            '</button>';
+    });
+
+    const modalHTML =
+        '<div id="gradebookOverlay" class="modal-overlay">' +
+        '  <div class="gradebook-modal gb-list-modal" onclick="event.stopPropagation()">' +
+        '    <button type="button" class="close-modal-btn" id="gbCloseBtn"><i class="fa-solid fa-xmark"></i></button>' +
+        
+        '    <!-- HEADER HỌC BẠ (CÓ TÍNH NĂNG CHỈNH SỬA) -->' +
+        '    <div class="gb-header">' +
+        '      <div style="flex: 1;">' +
+
+        '        <!-- CHẾ ĐỘ HIỂN THỊ -->' +
+        '        <div id="gb-view-info">' +
+        '          <div style="display:flex; align-items:center; gap:8px;">' +
+        '            <div class="gb-st-num">#' + (student.student_number || '') + '</div>' +
+        '            <button type="button" class="btn-edit-st" onclick="toggleEditStudentInfo(true)"><i class="fa-solid fa-pen-to-square"></i> Chỉnh sửa</button>' +
+        '          </div>' +
+        '          <h2 class="gb-st-name"></h2>' +
+        '          <div class="gb-meta"></div>' +
+        '          <div class="gb-phone" style="font-size:0.85rem; color:var(--text-sub); margin-top:4px;">' +
+        '             <i class="fa-solid fa-phone"></i> SĐT: <b>' + (student.phone || 'Chưa có') + '</b>' +
+        '          </div>' +
+        '        </div>' +
+
+        '        <!-- CHẾ ĐỘ CHỈNH SỬA -->' +
+        '        <div id="gb-edit-info" style="display:none; margin-right: 15px;">' +
+        '          <div style="display:grid; grid-template-columns: 80px 1fr; gap:8px; margin-bottom:8px;">' +
+        '            <input type="text" id="editStNumber" class="gb-edit-input" value="' + (student.student_number || '') + '" placeholder="STT">' +
+        '            <input type="text" id="editStName" class="gb-edit-input" value="' + (student.name || '') + '" placeholder="Tên học sinh">' +
+        '          </div>' +
+        '          <input type="text" id="editStPhone" class="gb-edit-input" value="' + (student.phone || '') + '" placeholder="Số điện thoại" style="margin-bottom:8px; width:100%;">' +
+        '          <div style="display:flex; gap:8px;">' +
+        '            <button type="button" class="btn-gb-save" onclick="saveStudentInfo(\'' + student.id + '\')"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>' +
+        '            <button type="button" class="btn-gb-cancel" onclick="toggleEditStudentInfo(false)"><i class="fa-solid fa-xmark"></i> Hủy</button>' +
+        '          </div>' +
+        '        </div>' +
+
+        '      </div>' +
+
+        '      <!-- KHU VỰC THỐNG KÊ ĐIỂM DANH -->' +
+        '      <div class="gb-attendance-box">' +
+        '        <div class="gb-att-item present">' +
+        '          <span class="gb-att-num">' + presentCount + '</span>' +
+        '          <span class="gb-att-label"><i class="fa-solid fa-user-check"></i> Có mặt</span>' +
+        '        </div>' +
+        '        <div class="gb-att-item absent">' +
+        '          <span class="gb-att-num">' + absentCount + '</span>' +
+        '          <span class="gb-att-label"><i class="fa-solid fa-user-xmark"></i> Vắng</span>' +
+        '        </div>' +
+        '      </div>' +
+        '    </div>' +
+
+        '    <div class="gb-section-label"><i class="fa-solid fa-list-check"></i> Chọn môn học</div>' +
+        '    <div class="gb-subject-list">' + subjectBtns + '</div>' +
+        '  </div>' +
+        '</div>';
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    const overlay = document.getElementById('gradebookOverlay');
+    overlay.querySelector('.gb-st-name').textContent = student.name || '';
+    overlay.querySelector('.gb-meta').textContent =
+        (currentClassName || '') + ' · Khối ' + currentClassGrade + ' · ' + (isPrimary ? 'Cấp 1' : 'Cấp 2');
+
+    overlay.addEventListener('click', function (e) {
+        if (e.target.id === 'gradebookOverlay') closeGradebook();
+    });
+    document.getElementById('gbCloseBtn').addEventListener('click', closeGradebook);
+
+    overlay.querySelectorAll('.gb-subject-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const idx = parseInt(btn.getAttribute('data-subject-idx'), 10);
+            openSubjectScores(subjects[idx]);
+        });
+    });
+};
+
+// --- CHUYỂN ĐỔI BẬT/TẮT FORM CHỈNH SỬA ---
+window.toggleEditStudentInfo = function (isEditing) {
+    const viewDiv = document.getElementById('gb-view-info');
+    const editDiv = document.getElementById('gb-edit-info');
+    if (viewDiv && editDiv) {
+        viewDiv.style.display = isEditing ? 'none' : 'block';
+        editDiv.style.display = isEditing ? 'block' : 'none';
+    }
+};
+
+// --- LƯU THÔNG TIN HỌC SINH VÀO SUPABASE ---
+window.saveStudentInfo = async function (studentId) {
+    const newName = document.getElementById('editStName')?.value.trim();
+    const newNumber = document.getElementById('editStNumber')?.value.trim();
+    const newPhone = document.getElementById('editStPhone')?.value.trim() || null;
+
+    if (!newName || !newNumber) {
+        alert('Vui lòng nhập đầy đủ Tên và STT!');
+        return;
+    }
+
+    const numberToSave = parseInt(newNumber, 10) || newNumber;
+
+    try {
+        const { error } = await _supabase
+            .from('students')
+            .update({
+                name: newName,
+                student_number: numberToSave,
+                phone: newPhone
+            })
+            .eq('id', studentId);
+
+        if (error) {
+            alert('Lỗi cập nhật: ' + error.message);
+            return;
+        }
+
+        alert('Cập nhật thông tin học sinh thành công!');
+        closeGradebook();
+        if (typeof loadStudents === 'function') {
+            loadStudents(); // Load lại danh sách bên ngoài trang chính
+        }
+    } catch (err) {
+        console.error('Lỗi lưu thông tin:', err);
+        alert('Có lỗi xảy ra khi lưu dữ liệu!');
+    }
+};
+
+// --- HÀM ĐÓNG HỌC BẠ ---
+window.closeGradebook = function () {
+    const modal = document.getElementById('gradebookOverlay');
+    if (modal) modal.remove();
+    window._gbCache = null;
+};

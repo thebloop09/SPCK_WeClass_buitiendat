@@ -55,7 +55,11 @@ function getTodayString() {
 // --- THEME ---
 function updateThemeUI(theme) {
     const el = document.getElementById('themeText');
-    if (el) el.innerText = theme === 'light' ? 'Chế độ Tối 🌙' : 'Chế độ Sáng ☀️';
+    if (el) {
+        el.innerHTML = theme === 'light'
+            ? '<i class="fa-solid fa-moon"></i> Chế độ Tối'
+            : '<i class="fa-solid fa-sun"></i> Chế độ Sáng';
+    }
 }
 
 window.toggleTheme = function () {
@@ -120,7 +124,7 @@ window.loadClasses = async function () {
         const item = document.createElement('div');
         item.className = 'class-item';
         item.innerHTML =
-            '<span class="class-icon">🎨</span>' +
+            '<span class="class-icon"><i class="fa-solid fa-chalkboard-user"></i></span>' +
             '<h4></h4>' +
             '<p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:1rem;">Khối ' + grade + ' · ' + capLabel + '</p>' +
             '<div class="class-actions">' +
@@ -254,7 +258,7 @@ async function loadStudents() {
         const btnHb = document.createElement('button');
         btnHb.type = 'button';
         btnHb.className = 'btn-hocba';
-        btnHb.textContent = '📘 Học bạ';
+        btnHb.innerHTML = '<i class="fa-solid fa-book-open"></i> Học bạ';
         btnHb.addEventListener('click', function (e) {
             e.stopPropagation();
             openGradebook(String(s.id));
@@ -262,7 +266,7 @@ async function loadStudents() {
 
         const del = document.createElement('span');
         del.className = 'delete-btn';
-        del.textContent = '✕';
+        del.innerHTML = '<i class="fa-solid fa-xmark"></i>';
         del.addEventListener('click', function (e) {
             deleteStudentEvent(e, String(s.id));
         });
@@ -371,7 +375,7 @@ window.openPointModal = (studentId) => {
     const modalHTML = `
         <div id="pointModalOverlay" class="modal-overlay" onclick="closePointModal(event)">
             <div class="point-modal-card" onclick="event.stopPropagation()">
-                <button class="close-modal-btn" onclick="closePointModal()">✕</button>
+                <button class="close-modal-btn" onclick="closePointModal()"><i class="fa-solid fa-xmark"></i></button>
                 <div class="modal-left">
                     <div class="st-number">#${student.student_number}</div>
                     <div class="st-name">${student.name}</div>
@@ -455,7 +459,7 @@ window.openGradebook = async (studentId) => {
     subjects.forEach((sub, i) => {
         subjectBtns +=
             '<button type="button" class="gb-subject-btn" data-subject-idx="' + i + '">' +
-            '<span class="gb-sub-icon">📖</span>' +
+            '<span class="gb-sub-icon"><i class="fa-solid fa-book-open-reader"></i></span>' +
             '<span class="gb-sub-name">' + sub + '</span>' +
             '<span class="gb-sub-arrow">›</span>' +
             '</button>';
@@ -464,7 +468,7 @@ window.openGradebook = async (studentId) => {
     const modalHTML =
         '<div id="gradebookOverlay" class="modal-overlay">' +
         '  <div class="gradebook-modal gb-list-modal" onclick="event.stopPropagation()">' +
-        '    <button type="button" class="close-modal-btn" id="gbCloseBtn">✕</button>' +
+        '    <button type="button" class="close-modal-btn" id="gbCloseBtn"><i class="fa-solid fa-xmark"></i></button>' +
         '    <div class="gb-header">' +
         '      <div>' +
         '        <div class="gb-st-num">#' + (student.student_number || '') + '</div>' +
@@ -625,7 +629,7 @@ window.openSubjectScores = function (subject) {
     const html =
         '<div id="subjectScoreOverlay" class="modal-overlay">' +
         '  <div class="gradebook-modal gb-score-modal" onclick="event.stopPropagation()">' +
-        '    <button type="button" class="close-modal-btn" id="subScoreCloseBtn">✕</button>' +
+        '    <button type="button" class="close-modal-btn" id="subScoreCloseBtn"><i class="fa-solid fa-xmark"></i></button>' +
         '    <div class="gb-score-header">' +
         '      <button type="button" class="gb-back-btn" id="subScoreBackBtn">← Quay lại</button>' +
         '      <h3 class="gb-score-title"></h3>' +
@@ -634,7 +638,7 @@ window.openSubjectScores = function (subject) {
         '    <div class="gb-scores-grid ' + (isPrimary ? 'primary' : 'secondary') + '">' + cells + '</div>' +
         avgSection +
         '    <div class="gb-footer">' +
-        '      <button type="button" class="btn-save-gb" id="btnSaveSubjectScore">💾 Lưu điểm môn này</button>' +
+        '      <button type="button" class="btn-save-gb" id="btnSaveSubjectScore"><i class="fa-solid fa-floppy-disk"></i> Lưu điểm môn này</button>' +
         '    </div>' +
         '  </div>' +
         '</div>';
@@ -767,7 +771,7 @@ window.saveSubjectScores = async function (studentId, subject) {
             });
         }
 
-        alert('Đã lưu điểm môn "' + subject + '" thành công! 📘');
+        alert('Đã lưu điểm môn "' + subject + '" thành công!');
         closeSubjectScores();
     } catch (e) {
         alert('Lỗi: ' + e.message + '\n\nHãy chạy SQL_HOCBA.sql trong Supabase trước.');
@@ -858,7 +862,7 @@ async function saveSchedule(type) {
     if (payload.length > 0) {
         const { error } = await _supabase.from('schedule').insert(payload);
         if (error) alert('Lỗi khi lưu: ' + error.message);
-        else alert('Lưu Thời Khóa Biểu thành công! ✨');
+        else alert('Lưu Thời Khóa Biểu thành công!');
     } else {
         alert('Đã xóa trống lịch biểu!');
     }
@@ -880,8 +884,8 @@ window.openTimerModal = function () {
     const modalHTML = `
         <div id="toolModalOverlay" class="modal-overlay" onclick="closeToolModal(event)">
             <div class="tool-modal-card" onclick="event.stopPropagation()">
-                <button class="close-modal-btn" onclick="closeToolModal()">✕</button>
-                <h2>⏱️ Hẹn Giờ</h2>
+                <button class="close-modal-btn" onclick="closeToolModal()"><i class="fa-solid fa-xmark"></i></button>
+                <h2><i class="fa-solid fa-clock"></i> Hẹn Giờ</h2>
                 <div class="timer-inputs">
                     <div class="timer-input-group">
                         <label for="timerMinutes">Số phút</label>
@@ -961,8 +965,8 @@ window.openStopwatchModal = function () {
     const modalHTML = `
         <div id="toolModalOverlay" class="modal-overlay" onclick="closeToolModal(event)">
             <div class="tool-modal-card" onclick="event.stopPropagation()">
-                <button class="close-modal-btn" onclick="closeToolModal()">✕</button>
-                <h2>⏲️ Đếm Giờ</h2>
+                <button class="close-modal-btn" onclick="closeToolModal()"><i class="fa-solid fa-xmark"></i></button>
+                <h2><i class="fa-solid fa-stopwatch"></i> Đếm Giờ</h2>
                 <div class="timer-display" id="stopwatchDisplay">00:00</div>
                 <div class="tool-controls">
                     <button type="button" onclick="startStopwatch()">Bắt đầu</button>
@@ -1021,7 +1025,7 @@ window.showAlertModal = function (message) {
     const modalHTML = `
         <div id="alertModalOverlay" class="modal-overlay" onclick="closeAlertModal(event)">
             <div class="alert-modal-card" onclick="event.stopPropagation()">
-                <div class="alert-icon">🔔</div>
+                <div class="alert-icon"><i class="fa-solid fa-bell"></i></div>
                 <div class="alert-title">${message}</div>
                 <button type="button" style="width: 100%; margin-top: 10px;" onclick="closeAlertModal()">Đóng</button>
             </div>

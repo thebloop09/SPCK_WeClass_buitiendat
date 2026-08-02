@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>EduClass - Quản Lý Lớp Học</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -23,8 +24,8 @@
                 <div class="dropdown-tools">
                     <button type="button" class="tools-btn">Công cụ</button>
                     <div class="tools-menu">
-                        <button type="button" class="menu-item" onclick="openTimerModal()">⏱️ Hẹn giờ</button>
-                        <button type="button" class="menu-item" onclick="openStopwatchModal()">⏲️ Đếm giờ</button>
+                        <button type="button" class="menu-item" onclick="openTimerModal()"><i class="fa-solid fa-clock"></i> Hẹn giờ</button>
+                        <button type="button" class="menu-item" onclick="openStopwatchModal()"><i class="fa-solid fa-stopwatch"></i> Đếm giờ</button>
                     </div>
                 </div>
             </div>
@@ -40,7 +41,7 @@
             <div class="avatar-btn" id="avatarBtn">U</div>
             <div class="dropdown-content" id="userDropdown">
                 <div class="dropdown-user-info" id="userEmailDisplay">user@gmail.com</div>
-                <button type="button" class="menu-item" onclick="toggleTheme()"><span id="themeText">Chế độ Tối 🌙</span></button>
+                <button type="button" class="menu-item" onclick="toggleTheme()"><span id="themeText"><i class="fa-solid fa-moon"></i> Chế độ Tối</span></button>
                 <button type="button" class="menu-item danger" id="btnLogout">Đăng xuất</button>
             </div>
         </div>
@@ -56,24 +57,24 @@
 
             <!-- Nút Bắt đầu thông minh (Tự chuyển class.html nếu đã đăng nhập) -->
             <button id="btnHeroStart" style="font-size: 1.1rem; padding: 18px 40px; border-radius: 25px;">
-                🚀 Bắt đầu ngay
+                <i class="fa-solid fa-rocket"></i> Bắt đầu ngay
             </button>
         </div>
 
         <!-- TÍNH NĂNG NỔI BẬT -->
         <div class="grid-features">
             <div class="feature-item">
-                <div style="font-size: 2.5rem; margin-bottom: 1rem;">🎨</div>
+                <div style="font-size: 2.5rem; margin-bottom: 1rem;"><i class="fa-solid fa-chalkboard-user"></i></div>
                 <h3>Quản lý Lớp học</h3>
                 <p style="color: var(--text-sub); font-size: 0.9rem; margin-top: 0.5rem;">Thêm danh sách học sinh, gọi tên ngẫu nhiên, tích điểm thi đua dễ dàng.</p>
             </div>
             <div class="feature-item">
-                <div style="font-size: 2.5rem; margin-bottom: 1rem;">📅</div>
+                <div style="font-size: 2.5rem; margin-bottom: 1rem;"><i class="fa-solid fa-calendar-days"></i></div>
                 <h3>Thời Khóa Biểu</h3>
                 <p style="color: var(--text-sub); font-size: 0.9rem; margin-top: 0.5rem;">Sắp xếp lịch học chính khóa và lịch dạy thêm khoa học, rõ ràng.</p>
             </div>
             <div class="feature-item">
-                <div style="font-size: 2.5rem; margin-bottom: 1rem;">⏱️</div>
+                <div style="font-size: 2.5rem; margin-bottom: 1rem;"><i class="fa-solid fa-stopwatch"></i></div>
                 <h3>Bộ Công Cụ Lớp Học</h3>
                 <p style="color: var(--text-sub); font-size: 0.9rem; margin-top: 0.5rem;">Hẹn giờ và đếm giờ làm bài tập trực tiếp ngay trên lớp.</p>
             </div>

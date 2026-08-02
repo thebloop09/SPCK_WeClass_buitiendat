@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Dashboard - WeClass</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 </head>
 <body>
@@ -17,8 +18,8 @@
                 <div class="dropdown-tools">
                     <button class="tools-btn" type="button">Công cụ </button>
                     <div class="tools-menu">
-                        <button class="menu-item" type="button" onclick="openTimerModal()">⏱️ Hẹn giờ</button>
-                        <button class="menu-item" type="button" onclick="openStopwatchModal()">⏲️ Đếm giờ</button>
+                        <button class="menu-item" type="button" onclick="openTimerModal()"><i class="fa-solid fa-clock"></i> Hẹn giờ</button>
+                        <button class="menu-item" type="button" onclick="openStopwatchModal()"><i class="fa-solid fa-stopwatch"></i> Đếm giờ</button>
                     </div>
                 </div>
             </div>
@@ -28,8 +29,8 @@
             <div class="avatar-btn" id="avatarBtn">U</div>
             <div class="dropdown-content" id="userDropdown">
                 <div class="dropdown-user-info"><b id="userEmailDisplay">...</b></div>
-                <button class="menu-item" onclick="toggleTheme()"><span id="themeText">Chế độ Tối 🌙</span></button>
-                <button class="menu-item" id="btnLogout" style="color:#ef4444">Đăng xuất 👋</button>
+                <button class="menu-item" onclick="toggleTheme()"><span id="themeText"><i class="fa-solid fa-moon"></i> Chế độ Tối</span></button>
+                <button class="menu-item" id="btnLogout" style="color:#ef4444"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
             </div>
         </div>
     </nav>
@@ -37,7 +38,7 @@
     <div class="container">
         <div id="class-section">
             <div class="card" style="padding:2rem; margin-bottom:2rem">
-                <h2>Lớp học của bạn 👋</h2>
+                <h2><i class="fa-solid fa-hand-wave"></i> Lớp học của bạn</h2>
                 <div style="display:flex; gap:10px; width:100%; max-width:560px; flex-wrap:wrap;">
                     <input type="text" id="className" placeholder="Tên lớp mới..." style="flex:1; min-width:160px;">
                     <select id="classGrade" style="width:140px; padding:14px 12px; border-radius:20px; border:2px solid transparent; background:var(--input-bg); color:var(--text-main); font-weight:600; font-size:0.95rem; cursor:pointer;">
@@ -62,7 +63,7 @@
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px;">
                 <div class="card">
                     <h2 id="current-class-title">...</h2>
-                    <div id="random-result" style="font-size:1.6rem; color:var(--primary); font-weight:800; min-height:80px; display:flex; flex-direction:column; justify-content:center; align-items:center;">🎲 ???</div>
+                    <div id="random-result" style="font-size:1.6rem; color:var(--primary); font-weight:800; min-height:80px; display:flex; flex-direction:column; justify-content:center; align-items:center;"><i class="fa-solid fa-dice"></i> ???</div>
                     <button id="btnRandom" type="button">Gọi STT ngẫu nhiên</button>
                     <hr style="width:100%; border:0; border-top:1px solid var(--border)">
                     <input type="text" id="stName" placeholder="Tên học sinh">

@@ -278,6 +278,12 @@ button {
     box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35), 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
+.fa-solid,
+.fa-regular,
+.fa-brands {
+    vertical-align: middle;
+}
+
 button:hover {
     background: var(--primary-hover);
     transform: translateY(-3px);

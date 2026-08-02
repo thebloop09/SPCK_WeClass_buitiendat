@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Thời Khóa Biểu - WeClass</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         .tkb-table {
@@ -62,8 +63,8 @@
                 <div class="dropdown-tools">
                     <button class="tools-btn" type="button">Công cụ</button>
                     <div class="tools-menu">
-                        <button class="menu-item" type="button" onclick="openTimerModal()">⏱️ Hẹn giờ</button>
-                        <button class="menu-item" type="button" onclick="openStopwatchModal()">⏲️ Đếm giờ</button>
+                        <button class="menu-item" type="button" onclick="openTimerModal()"><i class="fa-solid fa-clock"></i> Hẹn giờ</button>
+                        <button class="menu-item" type="button" onclick="openStopwatchModal()"><i class="fa-solid fa-stopwatch"></i> Đếm giờ</button>
                     </div>
                 </div>
             </div>
@@ -72,8 +73,8 @@
             <div class="avatar-btn" id="avatarBtn">U</div>
             <div class="dropdown-content" id="userDropdown">
                 <div class="dropdown-user-info"><b id="userEmailDisplay">...</b></div>
-                <button class="menu-item" onclick="toggleTheme()"><span id="themeText">Chế độ Tối 🌙</span></button>
-                <button class="menu-item" id="btnLogout" style="color:#ef4444">Đăng xuất 👋</button>
+                <button class="menu-item" onclick="toggleTheme()"><span id="themeText"><i class="fa-solid fa-moon"></i> Chế độ Tối</span></button>
+                <button class="menu-item" id="btnLogout" style="color:#ef4444"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
             </div>
         </div>
     </nav>
@@ -82,7 +83,7 @@
         <!-- TKB TRÊN TRƯỜNG -->
         <div class="card" style="margin-bottom: 2rem; align-items: stretch; text-align: left;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h2>🏫 Thời Khóa Biểu Trên Trường (5 Tiết)</h2>
+                <h2><i class="fa-solid fa-school"></i> Thời Khóa Biểu Trên Trường (5 Tiết)</h2>
                 <button id="btnSaveSchool" type="button" style="width: auto;">Lưu TKB Trường</button>
             </div>
             <div style="overflow-x: auto;">
@@ -108,7 +109,7 @@
         <!-- TKB DẠY THÊM -->
         <div class="card" style="align-items: stretch; text-align: left;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h2>✏️ Lịch Dạy Thêm (2 Ca)</h2>
+                <h2><i class="fa-solid fa-pen-to-square"></i> Lịch Dạy Thêm (2 Ca)</h2>
                 <button id="btnSaveExtra" type="button" style="width: auto;">Lưu Lịch Dạy Thêm</button>
             </div>
             <div style="overflow-x: auto;">

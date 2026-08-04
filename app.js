@@ -402,108 +402,8 @@ window.promptPointUpdate = async (studentId, type) => {
 };
 
 // ============================================================
-// HỌC BẠ ĐIỆN TỬ
+// HỌC BẠ ĐIỆN TỬ  (hàm openGradebook chính nằm ở cuối file, có AI đánh giá)
 // ============================================================
-window.openGradebook = async (studentId) => {
-    const student = currentStudents.find(s => String(s.id) === String(studentId));
-    if (!student) return;
-
-    document.getElementById('gradebookOverlay')?.remove();
-
-    let gradeMap = {};
-    try {
-        const { data: gradeRows } = await _supabase
-            .from('grades')
-            .select('*')
-            .eq('student_id', studentId);
-        (gradeRows || []).forEach(r => {
-            if (!gradeMap[r.subject]) gradeMap[r.subject] = {};
-            gradeMap[r.subject][r.score_key] = r.score_value;
-        });
-    } catch (e) { console.warn('grades:', e); }
-
-    let presentCount = 0;
-    let absentCount = 0;
-    try {
-        const { data: logs } = await _supabase
-            .from('attendance_logs')
-            .select('is_present')
-            .eq('student_id', studentId);
-        (logs || []).forEach(l => {
-            if (l.is_present) presentCount++;
-            else absentCount++;
-        });
-    } catch (e) { console.warn('attendance_logs:', e); }
-
-    window._gbCache = {
-        studentId: String(studentId),
-        student: student,
-        gradeMap: gradeMap,
-        presentCount: presentCount,
-        absentCount: absentCount
-    };
-
-    const subjects = getSubjectsForGrade(currentClassGrade);
-    const isPrimary = isPrimaryGrade(currentClassGrade);
-
-    let subjectBtns = '';
-    subjects.forEach((sub, i) => {
-        subjectBtns +=
-            '<button type="button" class="gb-subject-btn" data-subject-idx="' + i + '">' +
-            '<span class="gb-sub-icon"><i class="fa-solid fa-book-open-reader"></i></span>' +
-            '<span class="gb-sub-name">' + sub + '</span>' +
-            '<span class="gb-sub-arrow">›</span>' +
-            '</button>';
-    });
-
-    const phoneDisplay = student.phone ? `<div class="gb-phone" style="font-size:0.85rem; color:var(--text-sub); margin-top:2px;"><i class="fa-solid fa-phone"></i> SĐT: <b>${student.phone}</b></div>` : '';
-
-    const modalHTML =
-        '<div id="gradebookOverlay" class="modal-overlay">' +
-        '  <div class="gradebook-modal gb-list-modal" onclick="event.stopPropagation()">' +
-        '    <button type="button" class="close-modal-btn" id="gbCloseBtn"><i class="fa-solid fa-xmark"></i></button>' +
-        '    <div class="gb-header">' +
-        '      <div>' +
-        '        <div class="gb-st-num">#' + (student.student_number || '') + '</div>' +
-        '        <h2 class="gb-st-name"></h2>' +
-        '        <div class="gb-meta"></div>' +
-        phoneDisplay +
-        '      </div>' +
-        '      <div class="gb-attendance-box">' +
-        '        <div class="gb-att-item present">' +
-        '          <span class="gb-att-num">' + presentCount + '</span>' +
-        '          <span class="gb-att-label">Có mặt</span>' +
-        '        </div>' +
-        '        <div class="gb-att-item absent">' +
-        '          <span class="gb-att-num">' + absentCount + '</span>' +
-        '          <span class="gb-att-label">Vắng</span>' +
-        '        </div>' +
-        '      </div>' +
-        '    </div>' +
-        '    <div class="gb-section-label">Chọn môn học</div>' +
-        '    <div class="gb-subject-list">' + subjectBtns + '</div>' +
-        '  </div>' +
-        '</div>';
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-    const overlay = document.getElementById('gradebookOverlay');
-    overlay.querySelector('.gb-st-name').textContent = student.name || '';
-    overlay.querySelector('.gb-meta').textContent =
-        (currentClassName || '') + ' · Khối ' + currentClassGrade + ' · ' + (isPrimary ? 'Cấp 1' : 'Cấp 2');
-
-    overlay.addEventListener('click', function (e) {
-        if (e.target.id === 'gradebookOverlay') closeGradebook();
-    });
-    document.getElementById('gbCloseBtn').addEventListener('click', closeGradebook);
-
-    overlay.querySelectorAll('.gb-subject-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            const idx = parseInt(btn.getAttribute('data-subject-idx'), 10);
-            openSubjectScores(subjects[idx]);
-        });
-    });
-};
 
 function parseScore(val) {
     if (val === null || val === undefined) return null;
@@ -1217,7 +1117,163 @@ document.addEventListener('DOMContentLoaded', async () => {
 // --- KHỞI TẠO BIẾN TOÀN CỤC ---
 window._gbCache = null;
 
-// --- HÀM MỞ HỌC BẠ (CÓ NÚT & FORM CHỈNH SỬA Ở ĐẦU) ---
+
+// ============================================================
+// AI TỰ ĐỘNG ĐÁNH GIÁ HỌC SINH (dựa trên điểm cộng/trừ, điểm KT, chuyên cần)
+// ============================================================
+function generateAIEvaluation(student, gradeMap, presentCount, absentCount) {
+    const points = Number(student.points) || 0;
+    const totalDays = presentCount + absentCount;
+    const attendRate = totalDays > 0 ? (presentCount / totalDays) * 100 : null;
+
+    // Thu thập tất cả điểm số kiểm tra hợp lệ
+    const allScores = [];
+    Object.keys(gradeMap || {}).forEach(function (sub) {
+        const scores = gradeMap[sub] || {};
+        Object.keys(scores).forEach(function (k) {
+            if (k === 'comment' || k.startsWith('dtb_')) return;
+            const v = parseScore(scores[k]);
+            if (v !== null && v >= 0 && v <= 10) allScores.push(v);
+        });
+    });
+
+    let avgScore = null;
+    if (allScores.length > 0) {
+        avgScore = round1(allScores.reduce(function (a, b) { return a + b; }, 0) / allScores.length);
+    }
+
+    // --- Đánh giá chuyên cần ---
+    let attendComment = '';
+    let attendLevel = 'trung bình';
+    if (totalDays === 0) {
+        attendComment = 'Chưa có dữ liệu điểm danh.';
+    } else if (attendRate >= 95) {
+        attendComment = 'Chuyên cần rất tốt (' + presentCount + '/' + totalDays + ' buổi, tỷ lệ ' + attendRate.toFixed(0) + '%).';
+        attendLevel = 'xuất sắc';
+    } else if (attendRate >= 85) {
+        attendComment = 'Chuyên cần tốt (' + presentCount + '/' + totalDays + ' buổi, tỷ lệ ' + attendRate.toFixed(0) + '%).';
+        attendLevel = 'tốt';
+    } else if (attendRate >= 70) {
+        attendComment = 'Chuyên cần ở mức trung bình (' + presentCount + '/' + totalDays + ' buổi, vắng ' + absentCount + ' buổi). Cần cải thiện.';
+        attendLevel = 'trung bình';
+    } else {
+        attendComment = 'Chuyên cần yếu (vắng ' + absentCount + '/' + totalDays + ' buổi, tỷ lệ có mặt chỉ ' + attendRate.toFixed(0) + '%). Cần nhắc nhở nghiêm túc.';
+        attendLevel = 'yếu';
+    }
+
+    // --- Đánh giá thái độ / điểm cộng trừ ---
+    let behaviorComment = '';
+    let behaviorLevel = 'trung bình';
+    if (points >= 15) {
+        behaviorComment = 'Thái độ học tập và ý thức rất tích cực (điểm thi đua +' + points + '). Là tấm gương tốt cho lớp.';
+        behaviorLevel = 'xuất sắc';
+    } else if (points >= 5) {
+        behaviorComment = 'Thái độ học tập tốt, có nhiều lần được cộng điểm (+' + points + ').';
+        behaviorLevel = 'tốt';
+    } else if (points > 0) {
+        behaviorComment = 'Có cố gắng trong học tập và sinh hoạt (điểm thi đua +' + points + ').';
+        behaviorLevel = 'khá';
+    } else if (points === 0) {
+        behaviorComment = 'Điểm thi đua đang ở mức 0. Cần khuyến khích tham gia tích cực hơn.';
+        behaviorLevel = 'trung bình';
+    } else if (points > -10) {
+        behaviorComment = 'Có một số lần bị trừ điểm (tổng ' + points + '). Cần nhắc nhở về ý thức và kỷ luật.';
+        behaviorLevel = 'cần cố gắng';
+    } else {
+        behaviorComment = 'Điểm thi đua đang âm nhiều (' + points + '). Cần quan tâm, hỗ trợ và nhắc nhở nghiêm túc về thái độ.';
+        behaviorLevel = 'yếu';
+    }
+
+    // --- Đánh giá học lực (điểm kiểm tra) ---
+    let academicComment = '';
+    let academicLevel = 'chưa có dữ liệu';
+    if (avgScore === null) {
+        academicComment = 'Chưa có đủ điểm kiểm tra để đánh giá học lực.';
+    } else if (avgScore >= 9) {
+        academicComment = 'Học lực xuất sắc (điểm TB các bài kiểm tra ≈ ' + avgScore.toFixed(1) + ').';
+        academicLevel = 'xuất sắc';
+    } else if (avgScore >= 8) {
+        academicComment = 'Học lực giỏi (điểm TB các bài kiểm tra ≈ ' + avgScore.toFixed(1) + ').';
+        academicLevel = 'giỏi';
+    } else if (avgScore >= 6.5) {
+        academicComment = 'Học lực khá (điểm TB các bài kiểm tra ≈ ' + avgScore.toFixed(1) + ').';
+        academicLevel = 'khá';
+    } else if (avgScore >= 5) {
+        academicComment = 'Học lực trung bình (điểm TB các bài kiểm tra ≈ ' + avgScore.toFixed(1) + '). Cần ôn tập thêm.';
+        academicLevel = 'trung bình';
+    } else {
+        academicComment = 'Học lực còn yếu (điểm TB các bài kiểm tra ≈ ' + avgScore.toFixed(1) + '). Cần hỗ trợ và kèm cặp thêm.';
+        academicLevel = 'yếu';
+    }
+
+    // --- Tổng hợp nhận xét tổng quát ---
+    const levels = [attendLevel, behaviorLevel, academicLevel];
+    let overall = 'cần cố gắng';
+    if (levels.filter(function (l) { return l === 'xuất sắc' || l === 'giỏi' || l === 'tốt'; }).length >= 2 && !levels.includes('yếu')) {
+        overall = 'xuất sắc / tốt';
+    } else if (levels.includes('yếu') || levels.filter(function (l) { return l === 'cần cố gắng' || l === 'yếu'; }).length >= 2) {
+        overall = 'cần quan tâm đặc biệt';
+    } else if (levels.includes('trung bình') || levels.includes('khá')) {
+        overall = 'ổn định, có tiềm năng';
+    }
+
+    let summary = 'Nhận xét tổng quát: Học sinh đang ở mức <b>' + overall + '</b>. ';
+    if (overall.indexOf('xuất sắc') >= 0 || overall.indexOf('tốt') >= 0) {
+        summary += 'Nên tiếp tục duy trì và phát huy.';
+    } else if (overall.indexOf('quan tâm') >= 0) {
+        summary += 'Đề nghị gia đình và giáo viên phối hợp hỗ trợ nhiều hơn.';
+    } else {
+        summary += 'Cần động viên và theo dõi thêm trong thời gian tới.';
+    }
+
+    return {
+        attendComment: attendComment,
+        behaviorComment: behaviorComment,
+        academicComment: academicComment,
+        summary: summary,
+        avgScore: avgScore,
+        attendRate: attendRate,
+        points: points,
+        presentCount: presentCount,
+        absentCount: absentCount
+    };
+}
+
+function buildAIEvaluationHTML(evalData) {
+    if (!evalData) return '';
+    return (
+        '<div class="gb-ai-section">' +
+        '  <div class="gb-section-label"><i class="fa-solid fa-robot"></i> Đánh giá AI tự động</div>' +
+        '  <div class="gb-ai-card">' +
+        '    <div class="gb-ai-row">' +
+        '      <span class="gb-ai-icon"><i class="fa-solid fa-user-check"></i></span>' +
+        '      <div class="gb-ai-content">' +
+        '        <div class="gb-ai-title">Chuyên cần</div>' +
+        '        <div class="gb-ai-text">' + evalData.attendComment + '</div>' +
+        '      </div>' +
+        '    </div>' +
+        '    <div class="gb-ai-row">' +
+        '      <span class="gb-ai-icon"><i class="fa-solid fa-star"></i></span>' +
+        '      <div class="gb-ai-content">' +
+        '        <div class="gb-ai-title">Thái độ &amp; Điểm thi đua</div>' +
+        '        <div class="gb-ai-text">' + evalData.behaviorComment + '</div>' +
+        '      </div>' +
+        '    </div>' +
+        '    <div class="gb-ai-row">' +
+        '      <span class="gb-ai-icon"><i class="fa-solid fa-book"></i></span>' +
+        '      <div class="gb-ai-content">' +
+        '        <div class="gb-ai-title">Học lực (điểm kiểm tra)</div>' +
+        '        <div class="gb-ai-text">' + evalData.academicComment + '</div>' +
+        '      </div>' +
+        '    </div>' +
+        '    <div class="gb-ai-summary">' + evalData.summary + '</div>' +
+        '    <div class="gb-ai-hint"><i class="fa-solid fa-circle-info"></i> Đánh giá dựa trên: điểm cộng/trừ, điểm các bài kiểm tra đã nhập, số buổi có mặt &amp; vắng. Chỉ mang tính tham khảo.</div>' +
+        '  </div>' +
+        '</div>'
+    );
+}
+
+// --- HÀM MỞ HỌC BẠ (CÓ NÚT & FORM CHỈNH SỬA Ở ĐẦU + AI ĐÁNH GIÁ) ---
 window.openGradebook = async (studentId) => {
     const student = currentStudents.find(s => String(s.id) === String(studentId));
     if (!student) return;
@@ -1263,6 +1319,10 @@ window.openGradebook = async (studentId) => {
 
     const subjects = getSubjectsForGrade(currentClassGrade);
     const isPrimary = isPrimaryGrade(currentClassGrade);
+
+    // --- AI ĐÁNH GIÁ ---
+    const aiEval = generateAIEvaluation(student, gradeMap, presentCount, absentCount);
+    const aiHTML = buildAIEvaluationHTML(aiEval);
 
     let subjectBtns = '';
     subjects.forEach((sub, i) => {
@@ -1324,8 +1384,11 @@ window.openGradebook = async (studentId) => {
         '      </div>' +
         '    </div>' +
 
-        '    <div class="gb-section-label"><i class="fa-solid fa-list-check"></i> Chọn môn học</div>' +
-        '    <div class="gb-subject-list">' + subjectBtns + '</div>' +
+        '    <div class="gb-scroll-body">' +
+        aiHTML +
+        '      <div class="gb-section-label"><i class="fa-solid fa-list-check"></i> Chọn môn học</div>' +
+        '      <div class="gb-subject-list">' + subjectBtns + '</div>' +
+        '    </div>' +
         '  </div>' +
         '</div>';
 
@@ -1400,6 +1463,7 @@ window.saveStudentInfo = async function (studentId) {
 
 // --- HÀM ĐÓNG HỌC BẠ ---
 window.closeGradebook = function () {
+    document.getElementById('subjectScoreOverlay')?.remove();
     const modal = document.getElementById('gradebookOverlay');
     if (modal) modal.remove();
     window._gbCache = null;

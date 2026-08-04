@@ -452,6 +452,68 @@ function formatAvg(val) {
     return val.toFixed(1);
 }
 
+/** Cấp 1: tính mức hoàn thành 1 môn từ điểm kiểm tra định kỳ (gk1, ck1, gk2, ck2) */
+function calcPrimaryCompletion(scores) {
+    const keys = ['gk1', 'ck1', 'gk2', 'ck2'];
+    const vals = [];
+    keys.forEach(function (k) {
+        const v = parseScore(scores[k]);
+        if (v !== null && v >= 0 && v <= 10) vals.push(v);
+    });
+    if (vals.length === 0) {
+        return {
+            level: null,
+            label: 'Chưa đủ dữ liệu',
+            desc: 'Chưa có điểm kiểm tra định kỳ (Giữa kì / Cuối kì) để đánh giá mức hoàn thành.',
+            css: 'pending',
+            avg: null
+        };
+    }
+    const avg = round1(vals.reduce(function (a, b) { return a + b; }, 0) / vals.length);
+    if (avg >= 9.0) {
+        return {
+            level: 'tot',
+            label: 'Hoàn thành tốt',
+            desc: 'Học sinh thực hiện tốt các yêu cầu học tập của môn học, bài kiểm tra định kỳ đạt từ 9.0 – 10 điểm (TB ≈ ' + avg.toFixed(1) + ').',
+            css: 'tot',
+            avg: avg
+        };
+    }
+    if (avg >= 5.0) {
+        return {
+            level: 'hoanthanh',
+            label: 'Hoàn thành',
+            desc: 'Học sinh thực hiện được các yêu cầu học tập của môn học, bài kiểm tra định kỳ đạt từ 5.0 – 8.0 điểm (TB ≈ ' + avg.toFixed(1) + ').',
+            css: 'hoanthanh',
+            avg: avg
+        };
+    }
+    return {
+        level: 'chua',
+        label: 'Chưa hoàn thành',
+        desc: 'Học sinh chưa thực hiện được các yêu cầu học tập, bài kiểm tra định kỳ dưới 5.0 điểm (TB ≈ ' + avg.toFixed(1) + '). Sẽ được giáo viên hướng dẫn, hỗ trợ học lại để kiểm tra bổ sung.',
+        css: 'chua',
+        avg: avg
+    };
+}
+
+function renderPrimaryCompletionBox(comp) {
+    if (!comp) return '';
+    return (
+        '<div class="gb-avg-section gb-primary-complete-section">' +
+        '  <div class="gb-section-label">Mức hoàn thành môn (tự động)</div>' +
+        '  <div class="gb-complete-badge gb-complete-' + comp.css + '" id="primaryCompleteBox">' +
+        '    <span class="gb-complete-icon"><i class="fa-solid fa-award"></i></span>' +
+        '    <div>' +
+        '      <div class="gb-complete-label" id="primaryCompleteLabel">' + comp.label + '</div>' +
+        '      <div class="gb-complete-desc" id="primaryCompleteDesc">' + comp.desc + '</div>' +
+        '    </div>' +
+        '  </div>' +
+        '  <div class="gb-avg-hint">Cấp 1: Hoàn thành tốt (9.0–10) · Hoàn thành (5.0–8.0) · Chưa hoàn thành (&lt;5.0). Tự lưu khi bấm Lưu điểm.</div>' +
+        '</div>'
+    );
+}
+
 window.openSubjectScores = function (subject) {
     const cache = window._gbCache;
     if (!cache) return;
@@ -484,7 +546,10 @@ window.openSubjectScores = function (subject) {
         '</textarea></div>';
 
     let avgSection = '';
-    if (!isPrimary) {
+    if (isPrimary) {
+        const initComp = calcPrimaryCompletion(subScores);
+        avgSection = renderPrimaryCompletionBox(initComp);
+    } else {
         avgSection =
             '<div class="gb-avg-section">' +
             '  <div class="gb-section-label">Điểm trung bình môn (tự động)</div>' +
@@ -540,7 +605,27 @@ window.openSubjectScores = function (subject) {
         await saveSubjectScores(cache.studentId, subject);
     });
 
-    if (!isPrimary) {
+    if (isPrimary) {
+        function refreshPrimaryComplete() {
+            const scores = {};
+            ov.querySelectorAll('.gb-input[data-key]').forEach(function (inp) {
+                scores[inp.getAttribute('data-key')] = inp.value;
+            });
+            const comp = calcPrimaryCompletion(scores);
+            const box = document.getElementById('primaryCompleteBox');
+            const lab = document.getElementById('primaryCompleteLabel');
+            const desc = document.getElementById('primaryCompleteDesc');
+            if (box) {
+                box.className = 'gb-complete-badge gb-complete-' + comp.css;
+            }
+            if (lab) lab.textContent = comp.label;
+            if (desc) desc.textContent = comp.desc;
+        }
+        ov.querySelectorAll('.gb-input').forEach(function (inp) {
+            inp.addEventListener('input', refreshPrimaryComplete);
+        });
+        refreshPrimaryComplete();
+    } else {
         function refreshAvgs() {
             const scores = {};
             ov.querySelectorAll('.gb-input[data-key]').forEach(function (inp) {
@@ -590,11 +675,33 @@ window.saveSubjectScores = async function (studentId, subject) {
         }
     });
 
-    if (!isPrimaryGrade(currentClassGrade)) {
+    const now = new Date().toISOString();
+
+    if (isPrimaryGrade(currentClassGrade)) {
+        // Cấp 1: lưu mức hoàn thành + điểm TB môn
+        const comp = calcPrimaryCompletion(scores);
+        if (comp.level) {
+            payload.push({
+                student_id: studentId,
+                subject: subject,
+                score_key: 'muc_hoan_thanh',
+                score_value: comp.label,
+                updated_at: now
+            });
+        }
+        if (comp.avg !== null) {
+            payload.push({
+                student_id: studentId,
+                subject: subject,
+                score_key: 'dtb_mon',
+                score_value: comp.avg.toFixed(1),
+                updated_at: now
+            });
+        }
+    } else {
         const dtb1 = calcSemesterAvg(scores, 'gk1', 'ck1');
         const dtb2 = calcSemesterAvg(scores, 'gk2', 'ck2');
         const dtbYear = calcYearAvg(dtb1, dtb2);
-        const now = new Date().toISOString();
 
         if (dtb1 !== null) {
             payload.push({
@@ -921,6 +1028,211 @@ function closeToolsMenu() {
     }
 }
 
+
+// ============================================================
+// XUẤT FILE DANH SÁCH HỌC SINH (2 sheet gọn: Tóm tắt + Điểm chi tiết)
+// ============================================================
+function escapeCsvCell(val) {
+    const s = val === null || val === undefined ? '' : String(val);
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+}
+
+function downloadCsv(filename, headers, rows) {
+    const lines = [];
+    lines.push(headers.map(escapeCsvCell).join(','));
+    rows.forEach(function (row) {
+        lines.push(row.map(escapeCsvCell).join(','));
+    });
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function downloadXlsxWorkbook(filename, sheets) {
+    // sheets: [{ name, headers, rows }]
+    if (typeof XLSX === 'undefined') {
+        // Fallback: xuất sheet đầu dạng CSV
+        const s0 = sheets[0];
+        downloadCsv(filename.replace(/\.xlsx$/i, '.csv'), s0.headers, s0.rows);
+        return;
+    }
+    const wb = XLSX.utils.book_new();
+    sheets.forEach(function (sh) {
+        const data = [sh.headers].concat(sh.rows);
+        const ws = XLSX.utils.aoa_to_sheet(data);
+
+        // Độ rộng cột hợp lý
+        const colWidths = sh.headers.map(function (h, ci) {
+            let max = String(h || '').length;
+            sh.rows.forEach(function (r) {
+                const len = String(r[ci] == null ? '' : r[ci]).length;
+                if (len > max) max = len;
+            });
+            // Giới hạn để bảng không quá rộng
+            const w = Math.min(Math.max(max + 2, 8), 36);
+            return { wch: w };
+        });
+        ws['!cols'] = colWidths;
+
+        XLSX.utils.book_append_sheet(wb, ws, sh.name.substring(0, 31));
+    });
+    XLSX.writeFile(wb, filename);
+}
+
+window.exportStudentList = async function () {
+    if (!currentClassId || !currentUser) {
+        return alert('Vui lòng mở một lớp để xuất danh sách.');
+    }
+    if (!currentStudents || !currentStudents.length) {
+        return alert('Lớp chưa có học sinh.');
+    }
+
+    const btn = document.getElementById('btnExportStudents');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xuất...';
+    }
+
+    try {
+        const isPrimary = isPrimaryGrade(currentClassGrade);
+        const subjects = getSubjectsForGrade(currentClassGrade);
+        const scoreKeys = getScoreKeysForGrade(currentClassGrade);
+
+        const studentIds = currentStudents.map(function (s) { return s.id; });
+
+        const { data: gradeRows } = await _supabase
+            .from('grades')
+            .select('*')
+            .in('student_id', studentIds);
+
+        const { data: attLogs } = await _supabase
+            .from('attendance_logs')
+            .select('student_id, is_present')
+            .in('student_id', studentIds);
+
+        const gradeMapAll = {};
+        (gradeRows || []).forEach(function (r) {
+            const sid = String(r.student_id);
+            if (!gradeMapAll[sid]) gradeMapAll[sid] = {};
+            if (!gradeMapAll[sid][r.subject]) gradeMapAll[sid][r.subject] = {};
+            gradeMapAll[sid][r.subject][r.score_key] = r.score_value;
+        });
+
+        const attMap = {};
+        (attLogs || []).forEach(function (l) {
+            const sid = String(l.student_id);
+            if (!attMap[sid]) attMap[sid] = { present: 0, absent: 0 };
+            if (l.is_present) attMap[sid].present++;
+            else attMap[sid].absent++;
+        });
+
+        // ===== SHEET 1: Tóm tắt (gọn) — 1 dòng / học sinh =====
+        const summaryHeaders = isPrimary
+            ? ['STT', 'Họ tên', 'SĐT', 'Có mặt', 'Vắng', 'Điểm thi đua', 'Mức HT (AI)', 'Chuyên cần (AI)', 'Thái độ (AI)', 'Nhận xét tổng quát (AI)']
+            : ['STT', 'Họ tên', 'SĐT', 'Có mặt', 'Vắng', 'Điểm thi đua', 'Học lực (AI)', 'Chuyên cần (AI)', 'Thái độ (AI)', 'Nhận xét tổng quát (AI)'];
+
+        const summaryRows = currentStudents.map(function (st) {
+            const sid = String(st.id);
+            const gmap = gradeMapAll[sid] || {};
+            const att = attMap[sid] || { present: 0, absent: 0 };
+            const ai = generateAIEvaluation(st, gmap, att.present, att.absent);
+            const summaryText = (ai.summary || '').replace(/<[^>]+>/g, '');
+            const points = Number(st.points) || 0;
+
+            if (isPrimary) {
+                return [
+                    st.student_number || '',
+                    st.name || '',
+                    st.phone || '',
+                    att.present,
+                    att.absent,
+                    points,
+                    ai.completeLabel || '',
+                    ai.attendComment || '',
+                    ai.behaviorComment || '',
+                    summaryText
+                ];
+            }
+            return [
+                st.student_number || '',
+                st.name || '',
+                st.phone || '',
+                att.present,
+                att.absent,
+                points,
+                ai.academicComment || '',
+                ai.attendComment || '',
+                ai.behaviorComment || '',
+                summaryText
+            ];
+        });
+
+        // ===== SHEET 2: Điểm chi tiết — 1 dòng / (học sinh × môn) =====
+        const detailHeaders = ['STT', 'Họ tên', 'Môn'];
+        scoreKeys.forEach(function (sk) {
+            detailHeaders.push(sk.label);
+        });
+        if (isPrimary) {
+            detailHeaders.push('Mức hoàn thành');
+        } else {
+            detailHeaders.push('ĐTB HK1', 'ĐTB HK2', 'ĐTB cả năm');
+        }
+
+        const detailRows = [];
+        currentStudents.forEach(function (st) {
+            const sid = String(st.id);
+            const gmap = gradeMapAll[sid] || {};
+            subjects.forEach(function (sub) {
+                const scores = gmap[sub] || {};
+                const row = [
+                    st.student_number || '',
+                    st.name || '',
+                    sub
+                ];
+                scoreKeys.forEach(function (sk) {
+                    row.push(scores[sk.key] != null && scores[sk.key] !== '' ? scores[sk.key] : '');
+                });
+                if (isPrimary) {
+                    row.push(scores['muc_hoan_thanh'] || '');
+                } else {
+                    row.push(scores['dtb_hk1'] || '');
+                    row.push(scores['dtb_hk2'] || '');
+                    row.push(scores['dtb_cn'] || '');
+                }
+                detailRows.push(row);
+            });
+        });
+
+        const cap = isPrimary ? 'Cap1' : 'Cap2';
+        const safeName = (currentClassName || 'Lop').replace(/[\\/:*?"<>|]/g, '_');
+        const dateStr = getTodayString();
+        const filename = 'DanhSach_' + safeName + '_Khoi' + currentClassGrade + '_' + cap + '_' + dateStr + '.xlsx';
+
+        downloadXlsxWorkbook(filename, [
+            { name: 'TomTat', headers: summaryHeaders, rows: summaryRows },
+            { name: 'DiemChiTiet', headers: detailHeaders, rows: detailRows }
+        ]);
+
+        alert('Đã xuất file Excel (2 sheet):\n• TomTat — thông tin + đánh giá AI\n• DiemChiTiet — điểm từng môn (dạng dọc, gọn)\n\n' + filename);
+    } catch (e) {
+        console.error(e);
+        alert('Lỗi khi xuất file: ' + (e.message || e));
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-file-excel"></i> Xuất file';
+        }
+    }
+};
+
 // --- INIT APP ---
 document.addEventListener('DOMContentLoaded', async () => {
     const savedTheme = localStorage.getItem('theme') || 'light';
@@ -1112,6 +1424,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     clickAction('btnSaveSchool', () => saveSchedule('school'));
+    clickAction('btnExportStudents', () => exportStudentList());
     clickAction('btnSaveExtra', () => saveSchedule('extra'));
 });
 // --- KHỞI TẠO BIẾN TOÀN CỤC ---
@@ -1119,19 +1432,25 @@ window._gbCache = null;
 
 
 // ============================================================
-// AI TỰ ĐỘNG ĐÁNH GIÁ HỌC SINH (dựa trên điểm cộng/trừ, điểm KT, chuyên cần)
+// AI TỰ ĐỘNG ĐÁNH GIÁ HỌC SINH
+// - Cấp 1: theo mức Hoàn thành tốt / Hoàn thành / Chưa hoàn thành (TT 27/2020)
+// - Cấp 2: theo học lực + chuyên cần + điểm thi đua
 // ============================================================
 function generateAIEvaluation(student, gradeMap, presentCount, absentCount) {
     const points = Number(student.points) || 0;
     const totalDays = presentCount + absentCount;
     const attendRate = totalDays > 0 ? (presentCount / totalDays) * 100 : null;
+    const isPrimary = isPrimaryGrade(currentClassGrade);
 
-    // Thu thập tất cả điểm số kiểm tra hợp lệ
+    // Điểm kiểm tra định kỳ (Cấp 1: gk1, ck1, gk2, ck2) — bỏ comment & dtb_
+    const periodicKeys = isPrimary
+        ? ['gk1', 'ck1', 'gk2', 'ck2']
+        : ['mieng', 'tx1', 'tx2', 'tx3', 'gk1', 'ck1', 'gk2', 'ck2'];
+
     const allScores = [];
     Object.keys(gradeMap || {}).forEach(function (sub) {
         const scores = gradeMap[sub] || {};
-        Object.keys(scores).forEach(function (k) {
-            if (k === 'comment' || k.startsWith('dtb_')) return;
+        periodicKeys.forEach(function (k) {
             const v = parseScore(scores[k]);
             if (v !== null && v >= 0 && v <= 10) allScores.push(v);
         });
@@ -1142,7 +1461,7 @@ function generateAIEvaluation(student, gradeMap, presentCount, absentCount) {
         avgScore = round1(allScores.reduce(function (a, b) { return a + b; }, 0) / allScores.length);
     }
 
-    // --- Đánh giá chuyên cần ---
+    // --- Chuyên cần (dùng chung) ---
     let attendComment = '';
     let attendLevel = 'trung bình';
     if (totalDays === 0) {
@@ -1161,7 +1480,7 @@ function generateAIEvaluation(student, gradeMap, presentCount, absentCount) {
         attendLevel = 'yếu';
     }
 
-    // --- Đánh giá thái độ / điểm cộng trừ ---
+    // --- Thái độ / điểm thi đua (dùng chung) ---
     let behaviorComment = '';
     let behaviorLevel = 'trung bình';
     if (points >= 15) {
@@ -1184,7 +1503,74 @@ function generateAIEvaluation(student, gradeMap, presentCount, absentCount) {
         behaviorLevel = 'yếu';
     }
 
-    // --- Đánh giá học lực (điểm kiểm tra) ---
+    // ========== CẤP 1: Mức hoàn thành theo bảng quy định ==========
+    // Hoàn thành tốt: 9.0 – 10
+    // Hoàn thành:     5.0 – 8.0
+    // Chưa hoàn thành: dưới 5.0
+    if (isPrimary) {
+        let completeLevel = null; // 'tot' | 'hoanthanh' | 'chua'
+        let completeLabel = '';
+        let completeDesc = '';
+        let completeClass = '';
+
+        if (avgScore === null) {
+            completeLabel = 'Chưa đủ dữ liệu';
+            completeDesc = 'Chưa có điểm kiểm tra định kỳ (Giữa kì / Cuối kì) để đánh giá mức hoàn thành.';
+            completeClass = 'pending';
+        } else if (avgScore >= 9.0) {
+            completeLevel = 'tot';
+            completeLabel = 'Hoàn thành tốt';
+            completeDesc = 'Học sinh thực hiện tốt các yêu cầu học tập của môn học, bài kiểm tra định kỳ đạt từ 9.0 – 10 điểm (TB ≈ ' + avgScore.toFixed(1) + ').';
+            completeClass = 'tot';
+        } else if (avgScore >= 5.0) {
+            completeLevel = 'hoanthanh';
+            completeLabel = 'Hoàn thành';
+            completeDesc = 'Học sinh thực hiện được các yêu cầu học tập của môn học, bài kiểm tra định kỳ đạt từ 5.0 – 8.0 điểm (TB ≈ ' + avgScore.toFixed(1) + ').';
+            completeClass = 'hoanthanh';
+        } else {
+            completeLevel = 'chua';
+            completeLabel = 'Chưa hoàn thành';
+            completeDesc = 'Học sinh chưa thực hiện được các yêu cầu học tập, bài kiểm tra định kỳ dưới 5.0 điểm (TB ≈ ' + avgScore.toFixed(1) + '). Sẽ được giáo viên hướng dẫn, hỗ trợ học lại để kiểm tra bổ sung.';
+            completeClass = 'chua';
+        }
+
+        // Tổng hợp cấp 1: ưu tiên mức hoàn thành, kết hợp chuyên cần & thái độ
+        let summary = '';
+        if (completeLevel === 'tot') {
+            summary = 'Nhận xét tổng quát: <b>Hoàn thành tốt</b>. ';
+            if (attendLevel === 'yếu' || behaviorLevel === 'yếu') {
+                summary += 'Học lực tốt nhưng cần chú ý thêm chuyên cần / thái độ.';
+            } else {
+                summary += 'Nên tiếp tục duy trì và phát huy.';
+            }
+        } else if (completeLevel === 'hoanthanh') {
+            summary = 'Nhận xét tổng quát: <b>Hoàn thành</b>. ';
+            summary += 'Cần động viên để phấn đấu lên mức Hoàn thành tốt.';
+        } else if (completeLevel === 'chua') {
+            summary = 'Nhận xét tổng quát: <b>Chưa hoàn thành</b>. ';
+            summary += 'Đề nghị giáo viên hướng dẫn, hỗ trợ học lại và kiểm tra bổ sung. Phối hợp gia đình theo dõi.';
+        } else {
+            summary = 'Nhận xét tổng quát: Chưa đủ điểm kiểm tra định kỳ để xếp mức hoàn thành. Hãy nhập điểm Giữa kì / Cuối kì.';
+        }
+
+        return {
+            isPrimary: true,
+            attendComment: attendComment,
+            behaviorComment: behaviorComment,
+            academicComment: completeDesc,
+            completeLabel: completeLabel,
+            completeClass: completeClass,
+            completeLevel: completeLevel,
+            summary: summary,
+            avgScore: avgScore,
+            attendRate: attendRate,
+            points: points,
+            presentCount: presentCount,
+            absentCount: absentCount
+        };
+    }
+
+    // ========== CẤP 2: Học lực theo thang điểm ==========
     let academicComment = '';
     let academicLevel = 'chưa có dữ liệu';
     if (avgScore === null) {
@@ -1206,7 +1592,6 @@ function generateAIEvaluation(student, gradeMap, presentCount, absentCount) {
         academicLevel = 'yếu';
     }
 
-    // --- Tổng hợp nhận xét tổng quát ---
     const levels = [attendLevel, behaviorLevel, academicLevel];
     let overall = 'cần cố gắng';
     if (levels.filter(function (l) { return l === 'xuất sắc' || l === 'giỏi' || l === 'tốt'; }).length >= 2 && !levels.includes('yếu')) {
@@ -1227,6 +1612,7 @@ function generateAIEvaluation(student, gradeMap, presentCount, absentCount) {
     }
 
     return {
+        isPrimary: false,
         attendComment: attendComment,
         behaviorComment: behaviorComment,
         academicComment: academicComment,
@@ -1241,6 +1627,43 @@ function generateAIEvaluation(student, gradeMap, presentCount, absentCount) {
 
 function buildAIEvaluationHTML(evalData) {
     if (!evalData) return '';
+
+    // ===== Giao diện CẤP 1: ô mức hoàn thành theo bảng =====
+    if (evalData.isPrimary) {
+        const badgeClass = evalData.completeClass || 'pending';
+        return (
+            '<div class="gb-ai-section">' +
+            '  <div class="gb-section-label"><i class="fa-solid fa-robot"></i> Đánh giá AI tự động (Cấp 1)</div>' +
+            '  <div class="gb-ai-card">' +
+            '    <div class="gb-complete-badge gb-complete-' + badgeClass + '">' +
+            '      <span class="gb-complete-icon"><i class="fa-solid fa-award"></i></span>' +
+            '      <div>' +
+            '        <div class="gb-complete-label">' + (evalData.completeLabel || '—') + '</div>' +
+            '        <div class="gb-complete-desc">' + (evalData.academicComment || '') + '</div>' +
+            '      </div>' +
+            '    </div>' +
+            '    <div class="gb-ai-row">' +
+            '      <span class="gb-ai-icon"><i class="fa-solid fa-user-check"></i></span>' +
+            '      <div class="gb-ai-content">' +
+            '        <div class="gb-ai-title">Chuyên cần</div>' +
+            '        <div class="gb-ai-text">' + evalData.attendComment + '</div>' +
+            '      </div>' +
+            '    </div>' +
+            '    <div class="gb-ai-row">' +
+            '      <span class="gb-ai-icon"><i class="fa-solid fa-star"></i></span>' +
+            '      <div class="gb-ai-content">' +
+            '        <div class="gb-ai-title">Thái độ &amp; Điểm thi đua</div>' +
+            '        <div class="gb-ai-text">' + evalData.behaviorComment + '</div>' +
+            '      </div>' +
+            '    </div>' +
+            '    <div class="gb-ai-summary">' + evalData.summary + '</div>' +
+            '    <div class="gb-ai-hint"><i class="fa-solid fa-circle-info"></i> Cấp 1: Hoàn thành tốt (9.0–10) · Hoàn thành (5.0–8.0) · Chưa hoàn thành (&lt;5.0). Dựa trên điểm kiểm tra định kỳ, chuyên cần &amp; điểm thi đua. Chỉ mang tính tham khảo.</div>' +
+            '  </div>' +
+            '</div>'
+        );
+    }
+
+    // ===== Giao diện CẤP 2 =====
     return (
         '<div class="gb-ai-section">' +
         '  <div class="gb-section-label"><i class="fa-solid fa-robot"></i> Đánh giá AI tự động</div>' +
@@ -1326,10 +1749,31 @@ window.openGradebook = async (studentId) => {
 
     let subjectBtns = '';
     subjects.forEach((sub, i) => {
+        let badgeHtml = '';
+        if (isPrimary) {
+            const subScores = gradeMap[sub] || {};
+            // Ưu tiên mức đã lưu; không có thì tính tạm từ điểm
+            let muc = subScores['muc_hoan_thanh'] || '';
+            let css = 'pending';
+            if (!muc) {
+                const c = calcPrimaryCompletion(subScores);
+                muc = c.level ? c.label : '';
+                css = c.css;
+            } else if (muc.indexOf('tốt') >= 0) {
+                css = 'tot';
+            } else if (muc === 'Hoàn thành') {
+                css = 'hoanthanh';
+            } else if (muc.indexOf('Chưa') >= 0) {
+                css = 'chua';
+            }
+            if (muc) {
+                badgeHtml = '<span class="gb-sub-badge gb-sub-badge-' + css + '">' + muc + '</span>';
+            }
+        }
         subjectBtns +=
             '<button type="button" class="gb-subject-btn" data-subject-idx="' + i + '">' +
             '<span class="gb-sub-icon"><i class="fa-solid fa-book-open-reader"></i></span>' +
-            '<span class="gb-sub-name">' + sub + '</span>' +
+            '<span class="gb-sub-name">' + sub + badgeHtml + '</span>' +
             '<span class="gb-sub-arrow"><i class="fa-solid fa-chevron-right"></i></span>' +
             '</button>';
     });

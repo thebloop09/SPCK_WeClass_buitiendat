@@ -1416,3 +1416,165 @@ select#classGrade:focus {
         font-size: 0.82rem;
     }
 }
+
+/* ===== Ô mức giá mức hoàn thành CẤP 1 ===== */
+.gb-complete-badge {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 14px 14px;
+    border-radius: 16px;
+    border: 1.5px solid var(--border);
+    margin-bottom: 4px;
+}
+
+.gb-complete-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+
+.gb-complete-label {
+    font-size: 1.05rem;
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+
+.gb-complete-desc {
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+/* Hoàn thành tốt: 9.0–10 */
+.gb-complete-tot {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+}
+.gb-complete-tot .gb-complete-icon {
+    background: #10b981;
+    color: #fff;
+}
+.gb-complete-tot .gb-complete-label {
+    color: #059669;
+}
+
+/* Hoàn thành: 5.0–8.0 */
+.gb-complete-hoanthanh {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+}
+.gb-complete-hoanthanh .gb-complete-icon {
+    background: #3b82f6;
+    color: #fff;
+}
+.gb-complete-hoanthanh .gb-complete-label {
+    color: #2563eb;
+}
+
+/* Chưa hoàn thành: < 5.0 */
+.gb-complete-chua {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+.gb-complete-chua .gb-complete-icon {
+    background: #ef4444;
+    color: #fff;
+}
+.gb-complete-chua .gb-complete-label {
+    color: #dc2626;
+}
+
+/* Chưa đủ dữ liệu */
+.gb-complete-pending {
+    background: var(--input-bg);
+    border-color: var(--border);
+}
+.gb-complete-pending .gb-complete-icon {
+    background: var(--border);
+    color: var(--text-sub);
+}
+.gb-complete-pending .gb-complete-label {
+    color: var(--text-sub);
+}
+
+[data-theme="dark"] .gb-complete-tot {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.35);
+}
+[data-theme="dark"] .gb-complete-hoanthanh {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.35);
+}
+[data-theme="dark"] .gb-complete-chua {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.35);
+}
+
+/* Badge mức hoàn thành trên nút môn (Cấp 1) */
+.gb-sub-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.gb-sub-badge-tot {
+    background: #d1fae5;
+    color: #059669;
+}
+.gb-sub-badge-hoanthanh {
+    background: #dbeafe;
+    color: #2563eb;
+}
+.gb-sub-badge-chua {
+    background: #fee2e2;
+    color: #dc2626;
+}
+.gb-sub-badge-pending {
+    background: var(--border);
+    color: var(--text-sub);
+}
+[data-theme="dark"] .gb-sub-badge-tot {
+    background: rgba(16, 185, 129, 0.25);
+    color: #34d399;
+}
+[data-theme="dark"] .gb-sub-badge-hoanthanh {
+    background: rgba(59, 130, 246, 0.25);
+    color: #60a5fa;
+}
+[data-theme="dark"] .gb-sub-badge-chua {
+    background: rgba(239, 68, 68, 0.25);
+    color: #f87171;
+}
+
+/* Nút xuất file danh sách */
+.btn-export {
+    background: #10b981 !important;
+    color: white !important;
+    padding: 10px 16px !important;
+    border-radius: 14px !important;
+    font-size: 0.85rem !important;
+    font-weight: 700 !important;
+    width: auto !important;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
+    white-space: nowrap;
+}
+.btn-export:hover {
+    background: #059669 !important;
+    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45) !important;
+}
+.btn-export:disabled {
+    opacity: 0.7;
+    cursor: wait;
+    transform: none !important;
+}

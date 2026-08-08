@@ -8,6 +8,28 @@ let currentClassName = '';
 let currentStudents = [];
 let currentUser = null;
 let isRandomizing = false;
+let toastTimer = null;
+
+window.showToast = function (message, type = 'info') {
+    let toast = document.getElementById('appToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'appToast';
+        toast.setAttribute('role', 'status');
+        document.body.appendChild(toast);
+    }
+
+    const icons = { success: 'fa-circle-check', error: 'fa-circle-exclamation', info: 'fa-circle-info' };
+    toast.className = 'app-toast ' + type;
+    toast.innerHTML = '<i class="fa-solid ' + (icons[type] || icons.info) + '"></i><span></span>';
+    toast.querySelector('span').textContent = message;
+    requestAnimationFrame(() => toast.classList.add('show'));
+
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+    }, 2000);
+};
 
 // --- MÔN HỌC & CỘT ĐIỂM THEO CẤP ---
 const PRIMARY_SUBJECTS = [
@@ -67,6 +89,7 @@ window.toggleTheme = function () {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
     updateThemeUI(theme);
+    showToast('Đã chuyển sang chế độ ' + (theme === 'light' ? 'sáng' : 'tối'), 'success');
 };
 
 // --- KIỂM TRA & CẬP NHẬT GIAO DIỆN USER ---
@@ -390,7 +413,10 @@ window.closePointModal = (e) => {
 
 window.promptPointUpdate = async (studentId, type) => {
     const input = prompt(`Nhập số điểm muốn ${type === 1 ? 'CỘNG' : 'TRỪ'}:`);
-    if (!input || isNaN(parseInt(input, 10))) return;
+    if (!input || isNaN(parseInt(input, 10)) || parseInt(input, 10) <= 0) {
+        if (input !== null) showToast('Vui lòng nhập số điểm hợp lệ.', 'error');
+        return;
+    }
 
     const amount = parseInt(input, 10);
     const student = currentStudents.find(s => String(s.id) === String(studentId));
@@ -398,6 +424,7 @@ window.promptPointUpdate = async (studentId, type) => {
 
     await _supabase.from('students').update({ points: newPoints }).eq('id', studentId);
     closePointModal();
+    showToast(type === 1 ? 'Đã cộng điểm cho học sinh.' : 'Đã trừ điểm của học sinh.', 'success');
     loadStudents();
 };
 
@@ -740,7 +767,7 @@ window.saveSubjectScores = async function (studentId, subject) {
         if (payload.length > 0) {
             const { error } = await _supabase.from('grades').insert(payload);
             if (error) {
-                alert('Lỗi khi lưu: ' + error.message);
+                showToast('Lỗi khi lưu: ' + error.message, 'error');
                 return;
             }
         }
@@ -753,10 +780,10 @@ window.saveSubjectScores = async function (studentId, subject) {
             });
         }
 
-        alert('Đã lưu điểm môn "' + subject + '" thành công!');
+        showToast('Đã lưu điểm môn "' + subject + '" thành công!', 'success');
         closeSubjectScores();
     } catch (e) {
-        alert('Lỗi: ' + e.message);
+        showToast('Lỗi: ' + e.message, 'error');
     }
 };
 
@@ -820,7 +847,7 @@ async function loadSchedule() {
 }
 
 async function saveSchedule(type) {
-    if (!currentUser) return alert('Vui lòng đăng nhập!');
+    if (!currentUser) return showToast('Vui lòng đăng nhập!', 'error');
 
     await _supabase.from('schedule').delete().eq('user_id', currentUser.id).eq('type', type);
 
@@ -842,10 +869,10 @@ async function saveSchedule(type) {
 
     if (payload.length > 0) {
         const { error } = await _supabase.from('schedule').insert(payload);
-        if (error) alert('Lỗi khi lưu: ' + error.message);
-        else alert('Lưu Thời Khóa Biểu thành công!');
+        if (error) showToast('Lỗi khi lưu: ' + error.message, 'error');
+        else showToast('Lưu Thời Khóa Biểu thành công!', 'success');
     } else {
-        alert('Đã xóa trống lịch biểu!');
+        showToast('Đã xóa trống lịch biểu!', 'success');
     }
 }
 
@@ -899,7 +926,7 @@ window.startTimer = function () {
         timerTotalSeconds = m * 60 + s;
     }
 
-    if (timerTotalSeconds <= 0) return alert('Vui lòng nhập số thời gian hẹn giờ!');
+    if (timerTotalSeconds <= 0) return showToast('Vui lòng nhập số thời gian hẹn giờ!', 'error');
 
     updateTimerDisplay();
 
@@ -1089,10 +1116,10 @@ function downloadXlsxWorkbook(filename, sheets) {
 
 window.exportStudentList = async function () {
     if (!currentClassId || !currentUser) {
-        return alert('Vui lòng mở một lớp để xuất danh sách.');
+        return showToast('Vui lòng mở một lớp để xuất danh sách.', 'error');
     }
     if (!currentStudents || !currentStudents.length) {
-        return alert('Lớp chưa có học sinh.');
+        return showToast('Lớp chưa có học sinh.', 'error');
     }
 
     const btn = document.getElementById('btnExportStudents');
@@ -1221,10 +1248,10 @@ window.exportStudentList = async function () {
             { name: 'DiemChiTiet', headers: detailHeaders, rows: detailRows }
         ]);
 
-        alert('Đã xuất file Excel (2 sheet):\n• TomTat — thông tin + đánh giá AI\n• DiemChiTiet — điểm từng môn (dạng dọc, gọn)\n\n' + filename);
+        showToast('Đã xuất file Excel thành công: ' + filename, 'success');
     } catch (e) {
         console.error(e);
-        alert('Lỗi khi xuất file: ' + (e.message || e));
+        showToast('Lỗi khi xuất file: ' + (e.message || e), 'error');
     } finally {
         if (btn) {
             btn.disabled = false;
@@ -1279,22 +1306,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     const clickAction = (id, func) => { const el = document.getElementById(id); if (el) el.onclick = func; };
 
     clickAction('btnLogin', async () => {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        if (!email || !email.includes('@')) return showToast('Vui lòng nhập email hợp lệ.', 'error');
+        if (password.length < 6) return showToast('Mật khẩu phải có ít nhất 6 ký tự.', 'error');
         const { error } = await _supabase.auth.signInWithPassword({
-            email: document.getElementById('email').value,
-            password: document.getElementById('password').value
+            email,
+            password
         });
-        if (error) alert(error.message); else window.location.href = 'class.html';
+        if (error) showToast('Đăng nhập không thành công: ' + error.message, 'error'); else window.location.href = 'class.html';
     });
 
     clickAction('btnRegister', async () => {
+        const email = document.getElementById('email').value.trim();
         const password = document.getElementById('password').value;
         const confirmPassword = document.getElementById('confirmPassword')?.value || '';
-        if (password !== confirmPassword) return alert('Mật khẩu xác nhận không khớp.');
+        if (!email || !email.includes('@')) return showToast('Vui lòng nhập email hợp lệ.', 'error');
+        if (password.length < 6) return showToast('Mật khẩu phải có ít nhất 6 ký tự.', 'error');
+        if (password !== confirmPassword) return showToast('Mật khẩu xác nhận không khớp.', 'error');
         const { error } = await _supabase.auth.signUp({
-            email: document.getElementById('email').value,
+            email,
             password: password
         });
-        if (error) alert(error.message); else alert('Đăng ký thành công!');
+        if (error) showToast('Đăng ký không thành công: ' + error.message, 'error'); else showToast('Đăng ký thành công!', 'success');
     });
 
     clickAction('btnLogout', async () => {
@@ -1306,9 +1340,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const name = document.getElementById('className').value.trim();
         const gradeEl = document.getElementById('classGrade');
         const grade = parseInt(gradeEl?.value, 10) || 1;
-        if (!name) return alert('Nhập tên lớp');
-        if (!currentUser) return alert('Vui lòng đăng nhập');
-        if (grade < 1 || grade > 9) return alert('Khối lớp phải từ 1 đến 9');
+        if (!name) return showToast('Vui lòng nhập tên lớp.', 'error');
+        if (!currentUser) return showToast('Vui lòng đăng nhập.', 'error');
+        if (grade < 1 || grade > 9) return showToast('Khối lớp phải từ 1 đến 9.', 'error');
 
         const btn = document.getElementById('btnAddClass');
         if (btn) { btn.disabled = true; btn.innerText = 'Đang tạo...'; }
@@ -1318,13 +1352,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (error && (error.message || '').toLowerCase().includes('grade_level')) {
             const retry = await _supabase.from('classes').insert([{ name, user_id: currentUser.id }]);
             error = retry.error;
-            if (!error) alert('Đã tạo lớp (chưa có cột grade_level — hãy chạy SQL_HOCBA.sql)');
+            if (!error) showToast('Đã tạo lớp. Hãy cập nhật cột grade_level trong SQL khi thuận tiện.', 'success');
         }
 
         if (btn) { btn.disabled = false; btn.innerText = 'Tạo'; }
 
         if (error) {
-            alert('Lỗi tạo lớp: ' + error.message);
+            showToast('Lỗi tạo lớp: ' + error.message, 'error');
             return;
         }
 
@@ -1339,7 +1373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const rawNumber = document.getElementById('stNumber').value.trim();
         const phone = document.getElementById('stPhone')?.value.trim() || null;
 
-        if (!name || !rawNumber) return alert('Nhập đủ Tên và STT');
+        if (!name || !rawNumber) return showToast('Vui lòng nhập đủ tên và STT.', 'error');
 
         const numberToSave = parseInt(rawNumber, 10) || rawNumber;
         const today = getTodayString();
@@ -1371,7 +1405,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (error) {
-            alert(error.message);
+            showToast(error.message, 'error');
             return;
         }
 
@@ -1392,7 +1426,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     clickAction('btnRandom', () => {
-        if (!currentStudents.length) return alert('Lớp trống');
+        if (!currentStudents.length) return showToast('Lớp đang trống.', 'error');
         if (isRandomizing) return;
 
         isRandomizing = true;
@@ -1877,7 +1911,7 @@ window.saveStudentInfo = async function (studentId) {
     const newPhone = document.getElementById('editStPhone')?.value.trim() || null;
 
     if (!newName || !newNumber) {
-        alert('Vui lòng nhập đầy đủ Tên và STT!');
+        showToast('Vui lòng nhập đầy đủ tên và STT!', 'error');
         return;
     }
 
@@ -1894,18 +1928,18 @@ window.saveStudentInfo = async function (studentId) {
             .eq('id', studentId);
 
         if (error) {
-            alert('Lỗi cập nhật: ' + error.message);
+            showToast('Lỗi cập nhật: ' + error.message, 'error');
             return;
         }
 
-        alert('Cập nhật thông tin học sinh thành công!');
+        showToast('Cập nhật thông tin học sinh thành công!', 'success');
         closeGradebook();
         if (typeof loadStudents === 'function') {
             loadStudents(); // Load lại danh sách bên ngoài trang chính
         }
     } catch (err) {
         console.error('Lỗi lưu thông tin:', err);
-        alert('Có lỗi xảy ra khi lưu dữ liệu!');
+        showToast('Có lỗi xảy ra khi lưu dữ liệu!', 'error');
     }
 };
 
@@ -2012,16 +2046,23 @@ function initSettingsPage() {
             updateThemeUI(t);
             document.getElementById('themeOptLight')?.classList.toggle('active', t === 'light');
             document.getElementById('themeOptDark')?.classList.toggle('active', t === 'dark');
+            showToast('Đã chuyển sang chế độ ' + (t === 'light' ? 'sáng' : 'tối'), 'success');
         };
     });
 
     // Color presets
     document.querySelectorAll('.color-swatch').forEach(sw => {
-        sw.addEventListener('click', () => applyPrimaryColor(sw.getAttribute('data-color')));
+        sw.addEventListener('click', () => {
+            applyPrimaryColor(sw.getAttribute('data-color'));
+            showToast('Đã đổi màu giao diện.', 'success');
+        });
     });
     document.getElementById('btnApplyCustomColor')?.addEventListener('click', () => {
         const v = document.getElementById('customPrimary')?.value;
-        if (v) applyPrimaryColor(v);
+        if (v) {
+            applyPrimaryColor(v);
+            showToast('Đã áp dụng màu giao diện.', 'success');
+        }
     });
 
     // Font size
@@ -2033,30 +2074,39 @@ function initSettingsPage() {
     // Account actions
     document.getElementById('btnUpdateEmail')?.addEventListener('click', async () => {
         const email = document.getElementById('newEmailInput')?.value.trim();
-        if (!email || !email.includes('@')) return alert('Vui lòng nhập email hợp lệ.');
+        if (!email || !email.includes('@')) return showToast('Vui lòng nhập email hợp lệ.', 'error');
         try {
             const { error } = await _supabase.auth.updateUser({ email });
-            if (error) return alert('Lỗi: ' + error.message);
-            alert('Đã gửi yêu cầu cập nhật email. Kiểm tra hộp thư để xác nhận (nếu hệ thống yêu cầu).');
+            if (error) return showToast('Lỗi: ' + error.message, 'error');
+            showToast('Đã gửi yêu cầu cập nhật email. Hãy kiểm tra hộp thư.', 'success');
             document.getElementById('newEmailInput').value = '';
         } catch (e) {
-            alert('Có lỗi xảy ra: ' + (e.message || e));
+            showToast('Có lỗi xảy ra: ' + (e.message || e), 'error');
         }
     });
 
     document.getElementById('btnChangePassword')?.addEventListener('click', async () => {
+        const oldPassword = document.getElementById('oldPassword')?.value || '';
         const p1 = document.getElementById('newPassword')?.value || '';
-        const p2 = document.getElementById('confirmPassword')?.value || '';
-        if (p1.length < 6) return alert('Mật khẩu tối thiểu 6 ký tự.');
-        if (p1 !== p2) return alert('Hai mật khẩu không khớp.');
+        const p2 = document.getElementById('confirmNewPassword')?.value || '';
+        if (!oldPassword) return showToast('Vui lòng nhập mật khẩu cũ.', 'error');
+        if (p1.length < 6) return showToast('Mật khẩu tối thiểu 6 ký tự.', 'error');
+        if (p1 !== p2) return showToast('Hai mật khẩu không khớp.', 'error');
         try {
+            const { error: verifyError } = await _supabase.auth.signInWithPassword({
+                email: currentUser?.email || '',
+                password: oldPassword
+            });
+            if (verifyError) return showToast('Mật khẩu cũ không chính xác.', 'error');
+
             const { error } = await _supabase.auth.updateUser({ password: p1 });
-            if (error) return alert('Lỗi: ' + error.message);
-            alert('Đổi mật khẩu thành công!');
+            if (error) return showToast('Lỗi: ' + error.message, 'error');
+            showToast('Đổi mật khẩu thành công!', 'success');
+            document.getElementById('oldPassword').value = '';
             document.getElementById('newPassword').value = '';
-            document.getElementById('confirmPassword').value = '';
+            document.getElementById('confirmNewPassword').value = '';
         } catch (e) {
-            alert('Có lỗi xảy ra: ' + (e.message || e));
+            showToast('Có lỗi xảy ra: ' + (e.message || e), 'error');
         }
     });
 
@@ -2065,7 +2115,7 @@ function initSettingsPage() {
         const ok = confirm('Bạn chắc chắn muốn XÓA TÀI KHOẢN?\n\nToàn bộ lớp, học sinh, điểm, điểm danh, lịch và tài khoản đăng nhập sẽ bị xóa vĩnh viễn trên Supabase.\nHành động không thể hoàn tác.');
         if (!ok) return;
         const confirmText = prompt('Nhập "XOA" (viết hoa) để xác nhận:');
-        if (confirmText !== 'XOA') return alert('Đã hủy.');
+        if (confirmText !== 'XOA') return showToast('Đã hủy.', 'info');
 
         try {
             const uid = currentUser.id;
@@ -2119,14 +2169,14 @@ function initSettingsPage() {
             await _supabase.auth.signOut();
 
             if (authDeleted) {
-                alert('Đã xóa toàn bộ dữ liệu và tài khoản trên Supabase.');
+                showToast('Đã xóa toàn bộ dữ liệu và tài khoản trên Supabase.', 'success');
             } else {
-                alert('Đã xóa dữ liệu lớp học và đăng xuất.\n\nChưa xóa được tài khoản auth.\nChi tiết: ' + (edgeMsg || 'không rõ') + '\n\nKiểm tra tab Code của function super-action đã dán code xóa user chưa.');
+                showToast('Đã xóa dữ liệu lớp học và đăng xuất. Chưa xóa được tài khoản auth: ' + (edgeMsg || 'không rõ'), 'info');
             }
             window.location.href = 'index.html';
         } catch (e) {
             console.error(e);
-            alert('Lỗi khi xóa dữ liệu: ' + (e.message || e));
+            showToast('Lỗi khi xóa dữ liệu: ' + (e.message || e), 'error');
         }
     });
 
@@ -2136,9 +2186,9 @@ function initSettingsPage() {
         if (!confirm('Xóa toàn bộ thời khóa biểu (trường + dạy thêm)?')) return;
         try {
             await _supabase.from('schedule').delete().eq('user_id', currentUser.id);
-            alert('Đã xóa toàn bộ TKB.');
+            showToast('Đã xóa toàn bộ TKB.', 'success');
         } catch (e) {
-            alert('Lỗi: ' + (e.message || e));
+            showToast('Lỗi: ' + (e.message || e), 'error');
         }
     });
 

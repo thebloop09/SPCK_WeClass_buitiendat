@@ -1287,9 +1287,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     clickAction('btnRegister', async () => {
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirmPassword')?.value || '';
+        if (password !== confirmPassword) return alert('Mật khẩu xác nhận không khớp.');
         const { error } = await _supabase.auth.signUp({
             email: document.getElementById('email').value,
-            password: document.getElementById('password').value
+            password: password
         });
         if (error) alert(error.message); else alert('Đăng ký thành công!');
     });

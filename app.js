@@ -1236,6 +1236,7 @@ window.exportStudentList = async function () {
 // --- INIT APP ---
 document.addEventListener('DOMContentLoaded', async () => {
     const savedTheme = localStorage.getItem('theme') || 'light';
+    if (typeof loadAppearanceSettings === 'function') loadAppearanceSettings();
     document.documentElement.setAttribute('data-theme', savedTheme);
     updateThemeUI(savedTheme);
 
@@ -1912,3 +1913,232 @@ window.closeGradebook = function () {
     if (modal) modal.remove();
     window._gbCache = null;
 };
+
+// ============================================================
+// CÀI ĐẶT: GIAO DIỆN + TÀI KHOẢN
+// ============================================================
+
+const PRIMARY_PRESETS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#3b82f6'];
+
+function hexToRgb(hex) {
+    const h = hex.replace('#', '');
+    const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+    const n = parseInt(full, 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function darkenHex(hex, amount) {
+    const { r, g, b } = hexToRgb(hex);
+    const f = 1 - amount;
+    const toHex = (v) => Math.max(0, Math.min(255, Math.round(v * f))).toString(16).padStart(2, '0');
+    return '#' + toHex(r) + toHex(g) + toHex(b);
+}
+
+function applyPrimaryColor(hex) {
+    if (!hex || !/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(hex)) return;
+    document.documentElement.style.setProperty('--primary', hex);
+    document.documentElement.style.setProperty('--primary-hover', darkenHex(hex, 0.12));
+    localStorage.setItem('primaryColor', hex);
+    document.querySelectorAll('.color-swatch').forEach(el => {
+        el.classList.toggle('active', el.getAttribute('data-color') === hex);
+    });
+    const custom = document.getElementById('customPrimary');
+    if (custom) custom.value = hex;
+}
+
+function applyFontSize(size) {
+    document.documentElement.setAttribute('data-font', size === 'large' ? 'large' : 'normal');
+    localStorage.setItem('fontSize', size === 'large' ? 'large' : 'normal');
+    document.querySelectorAll('.font-size-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-size') === size);
+    });
+}
+
+function loadAppearanceSettings() {
+    const savedColor = localStorage.getItem('primaryColor') || '#6366f1';
+    applyPrimaryColor(savedColor);
+    const fontSize = localStorage.getItem('fontSize') || 'normal';
+    applyFontSize(fontSize);
+}
+
+// Cập nhật applyUserSession để hiện link Cài đặt + bảo vệ trang settings
+const _origApplyUserSession = applyUserSession;
+applyUserSession = function (user) {
+    _origApplyUserSession(user);
+    document.querySelectorAll('.nav-settings-link').forEach(el => {
+        el.style.display = user ? '' : 'none';
+    });
+    if (window.location.pathname.includes('settings.html')) {
+        if (!user) {
+            window.location.href = 'login.html';
+            return;
+        }
+        initSettingsPage();
+    }
+};
+
+function initSettingsPage() {
+    if (!window.location.pathname.includes('settings.html')) return;
+
+    // Sidebar navigation
+    document.querySelectorAll('.settings-nav-item').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const panel = btn.getAttribute('data-panel');
+            document.querySelectorAll('.settings-nav-item').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+            const target = document.getElementById('panel-' + panel);
+            if (target) target.classList.add('active');
+        });
+    });
+
+    // Email
+    const emailEl = document.getElementById('settingsEmail');
+    if (emailEl && currentUser) emailEl.textContent = currentUser.email || '—';
+
+    // Theme options highlight
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
+    document.getElementById('themeOptLight')?.classList.toggle('active', theme === 'light');
+    document.getElementById('themeOptDark')?.classList.toggle('active', theme === 'dark');
+
+    document.querySelectorAll('[data-theme-set]').forEach(btn => {
+        btn.onclick = () => {
+            const t = btn.getAttribute('data-theme-set');
+            document.documentElement.setAttribute('data-theme', t);
+            localStorage.setItem('theme', t);
+            updateThemeUI(t);
+            document.getElementById('themeOptLight')?.classList.toggle('active', t === 'light');
+            document.getElementById('themeOptDark')?.classList.toggle('active', t === 'dark');
+        };
+    });
+
+    // Color presets
+    document.querySelectorAll('.color-swatch').forEach(sw => {
+        sw.addEventListener('click', () => applyPrimaryColor(sw.getAttribute('data-color')));
+    });
+    document.getElementById('btnApplyCustomColor')?.addEventListener('click', () => {
+        const v = document.getElementById('customPrimary')?.value;
+        if (v) applyPrimaryColor(v);
+    });
+
+    // Font size
+    document.querySelectorAll('.font-size-btn').forEach(btn => {
+        btn.addEventListener('click', () => applyFontSize(btn.getAttribute('data-size')));
+    });
+    loadAppearanceSettings();
+
+    // Account actions
+    document.getElementById('btnUpdateEmail')?.addEventListener('click', async () => {
+        const email = document.getElementById('newEmailInput')?.value.trim();
+        if (!email || !email.includes('@')) return alert('Vui lòng nhập email hợp lệ.');
+        try {
+            const { error } = await _supabase.auth.updateUser({ email });
+            if (error) return alert('Lỗi: ' + error.message);
+            alert('Đã gửi yêu cầu cập nhật email. Kiểm tra hộp thư để xác nhận (nếu hệ thống yêu cầu).');
+            document.getElementById('newEmailInput').value = '';
+        } catch (e) {
+            alert('Có lỗi xảy ra: ' + (e.message || e));
+        }
+    });
+
+    document.getElementById('btnChangePassword')?.addEventListener('click', async () => {
+        const p1 = document.getElementById('newPassword')?.value || '';
+        const p2 = document.getElementById('confirmPassword')?.value || '';
+        if (p1.length < 6) return alert('Mật khẩu tối thiểu 6 ký tự.');
+        if (p1 !== p2) return alert('Hai mật khẩu không khớp.');
+        try {
+            const { error } = await _supabase.auth.updateUser({ password: p1 });
+            if (error) return alert('Lỗi: ' + error.message);
+            alert('Đổi mật khẩu thành công!');
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+        } catch (e) {
+            alert('Có lỗi xảy ra: ' + (e.message || e));
+        }
+    });
+
+    document.getElementById('btnDeleteAccount')?.addEventListener('click', async () => {
+        if (!currentUser) return;
+        const ok = confirm('Bạn chắc chắn muốn XÓA TÀI KHOẢN?\n\nToàn bộ lớp, học sinh, điểm, điểm danh, lịch sẽ bị xóa vĩnh viễn.\nHành động không thể hoàn tác.');
+        if (!ok) return;
+        const confirmText = prompt('Nhập "XOA" (viết hoa) để xác nhận:');
+        if (confirmText !== 'XOA') return alert('Đã hủy.');
+
+        try {
+            const uid = currentUser.id;
+            // Xóa dữ liệu theo user (schedule, classes -> students/grades cascade nếu có FK)
+            await _supabase.from('schedule').delete().eq('user_id', uid);
+            const { data: classes } = await _supabase.from('classes').select('id').eq('user_id', uid);
+            const classIds = (classes || []).map(c => c.id);
+            if (classIds.length) {
+                const { data: students } = await _supabase.from('students').select('id').in('class_id', classIds);
+                const studentIds = (students || []).map(s => s.id);
+                if (studentIds.length) {
+                    await _supabase.from('grades').delete().in('student_id', studentIds);
+                    await _supabase.from('attendance_logs').delete().in('student_id', studentIds);
+                    await _supabase.from('students').delete().in('id', studentIds);
+                }
+                await _supabase.from('classes').delete().eq('user_id', uid);
+            }
+            // Không thể xóa auth.users bằng anon key; đăng xuất sau khi xóa dữ liệu
+            await _supabase.auth.signOut();
+            alert('Đã xóa toàn bộ dữ liệu lớp học và đăng xuất.\nLưu ý: Tài khoản đăng nhập vẫn có thể tồn tại phía máy chủ (cần admin xóa hoàn toàn nếu cần).');
+            window.location.href = 'index.html';
+        } catch (e) {
+            console.error(e);
+            alert('Lỗi khi xóa dữ liệu: ' + (e.message || e));
+        }
+    });
+
+    document.getElementById('btnRefreshStats')?.addEventListener('click', loadSettingsStats);
+    document.getElementById('btnClearSchedule')?.addEventListener('click', async () => {
+        if (!currentUser) return;
+        if (!confirm('Xóa toàn bộ thời khóa biểu (trường + dạy thêm)?')) return;
+        try {
+            await _supabase.from('schedule').delete().eq('user_id', currentUser.id);
+            alert('Đã xóa toàn bộ TKB.');
+        } catch (e) {
+            alert('Lỗi: ' + (e.message || e));
+        }
+    });
+
+    loadSettingsStats();
+}
+
+async function loadSettingsStats() {
+    if (!currentUser) return;
+    try {
+        const { data: classes } = await _supabase.from('classes').select('id').eq('user_id', currentUser.id);
+        const classIds = (classes || []).map(c => c.id);
+        let studentCount = 0;
+        if (classIds.length) {
+            const { data: st, count } = await _supabase.from('students').select('id', { count: 'exact' }).in('class_id', classIds);
+            studentCount = count != null ? count : (st || []).length;
+        }
+        const elC = document.getElementById('statClasses');
+        const elS = document.getElementById('statStudents');
+        if (elC) elC.textContent = String(classIds.length);
+        if (elS) elS.textContent = String(studentCount);
+    } catch (e) {
+        console.warn('stats', e);
+    }
+}
+
+// Load appearance sớm (màu + font) trước khi DOM ready xong
+(function earlyAppearance() {
+    try {
+        const c = localStorage.getItem('primaryColor');
+        if (c) {
+            document.documentElement.style.setProperty('--primary', c);
+            // primary-hover tạm
+            document.documentElement.style.setProperty('--primary-hover', c);
+        }
+        const f = localStorage.getItem('fontSize');
+        if (f === 'large') document.documentElement.setAttribute('data-font', 'large');
+    } catch (_) {}
+})();
+
+// Nếu DOM đã sẵn sàng khi script load xong phần settings
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    try { loadAppearanceSettings(); } catch (_) {}
+}

@@ -18,7 +18,8 @@
             <div class="nav-links">
                 <a href="tkb.html">Thời khóa biểu</a>                
                 <a href="class.html">Lớp học</a>
-                <a href="index.html" class="active">Giới thiệu</a>                
+                <a href="index.html" class="active">Giới thiệu</a>
+                <a href="settings.html" class="nav-settings-link" style="display:none;">Cài đặt</a>
                 
                 <!-- Dropdown Công cụ -->
                 <div class="dropdown-tools">
@@ -42,6 +43,7 @@
             <div class="dropdown-content" id="userDropdown">
                 <div class="dropdown-user-info" id="userEmailDisplay">user@gmail.com</div>
                 <button type="button" class="menu-item" onclick="toggleTheme()"><span id="themeText"><i class="fa-solid fa-moon"></i> Chế độ Tối</span></button>
+                <a href="settings.html" class="menu-item" style="text-decoration:none;display:block;"><i class="fa-solid fa-gear"></i> Cài đặt</a>
                 <button type="button" class="menu-item danger" id="btnLogout">Đăng xuất</button>
             </div>
         </div>
@@ -49,13 +51,13 @@
 
     <!-- MAIN HERO CONTENT -->
     <div class="container">
-        <div class="card" style="max-width: 800px; margin: 2rem auto; padding: 4rem 2rem;">
-            <h1 style="font-size: 2.8rem; font-weight: 800; margin-bottom: 1rem;">Nền Tảng Quản Lý Lớp Học Thông Minh</h1>
+        <div class="card hero-card" style="max-width: 800px; margin: 2rem auto; padding: 4rem 2rem;">
+            <div class="hero-badge"><i class="fa-solid fa-sparkles"></i> Nền tảng giáo dục thông minh</div>
+            <h1 style="font-size: 2.8rem; font-weight: 800; margin-bottom: 1rem;">Quản lý lớp học<br><span class="gradient-text">thông minh hơn</span></h1>
             <p style="color: var(--text-sub); font-size: 1.1rem; max-width: 600px; margin-bottom: 2rem;">
-                Hỗ trợ giáo viên điểm danh, gọi tên ngẫu nhiên, cộng trừ điểm học sinh và sắp xếp thời khóa biểu một cách đơn giản, trực quan.
+                Hỗ trợ giáo viên điểm danh, gọi tên ngẫu nhiên, cộng trừ điểm học sinh, học bạ điện tử và sắp xếp thời khóa biểu một cách đơn giản, trực quan.
             </p>
 
-            <!-- Nút Bắt đầu thông minh (Tự chuyển class.html nếu đã đăng nhập) -->
             <button id="btnHeroStart" style="font-size: 1.1rem; padding: 18px 40px; border-radius: 25px;">
                 <i class="fa-solid fa-rocket"></i> Bắt đầu ngay
             </button>
@@ -64,17 +66,17 @@
         <!-- TÍNH NĂNG NỔI BẬT -->
         <div class="grid-features">
             <div class="feature-item">
-                <div style="font-size: 2.5rem; margin-bottom: 1rem;"><i class="fa-solid fa-chalkboard-user"></i></div>
+                <div class="feature-icon"><i class="fa-solid fa-chalkboard-user"></i></div>
                 <h3>Quản lý Lớp học</h3>
                 <p style="color: var(--text-sub); font-size: 0.9rem; margin-top: 0.5rem;">Thêm danh sách học sinh, gọi tên ngẫu nhiên, tích điểm thi đua dễ dàng.</p>
             </div>
             <div class="feature-item">
-                <div style="font-size: 2.5rem; margin-bottom: 1rem;"><i class="fa-solid fa-calendar-days"></i></div>
+                <div class="feature-icon"><i class="fa-solid fa-calendar-days"></i></div>
                 <h3>Thời Khóa Biểu</h3>
                 <p style="color: var(--text-sub); font-size: 0.9rem; margin-top: 0.5rem;">Sắp xếp lịch học chính khóa và lịch dạy thêm khoa học, rõ ràng.</p>
             </div>
             <div class="feature-item">
-                <div style="font-size: 2.5rem; margin-bottom: 1rem;"><i class="fa-solid fa-stopwatch"></i></div>
+                <div class="feature-icon"><i class="fa-solid fa-stopwatch"></i></div>
                 <h3>Bộ Công Cụ Lớp Học</h3>
                 <p style="color: var(--text-sub); font-size: 0.9rem; margin-top: 0.5rem;">Hẹn giờ và đếm giờ làm bài tập trực tiếp ngay trên lớp.</p>
             </div>

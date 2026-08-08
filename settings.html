@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Cài đặt - WeClass</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+</head>
+<body>
+    <nav>
+        <div class="nav-left">
+            <a href="index.html" class="logo">We<span>Class</span></a>
+            <div class="nav-links">
+                <a href="tkb.html">Thời khóa biểu</a>
+                <a href="class.html">Lớp học</a>
+                <a href="index.html">Giới thiệu</a>
+                <a href="settings.html" class="active nav-settings-link">Cài đặt</a>
+                <div class="dropdown-tools">
+                    <button class="tools-btn" type="button">Công cụ</button>
+                    <div class="tools-menu">
+                        <button class="menu-item" type="button" onclick="openTimerModal()"><i class="fa-solid fa-clock"></i> Hẹn giờ</button>
+                        <button class="menu-item" type="button" onclick="openStopwatchModal()"><i class="fa-solid fa-stopwatch"></i> Đếm giờ</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="user-menu" id="userMenu" style="display: none;">
+            <div class="avatar-btn" id="avatarBtn">U</div>
+            <div class="dropdown-content" id="userDropdown">
+                <div class="dropdown-user-info"><b id="userEmailDisplay">...</b></div>
+                <button class="menu-item" onclick="toggleTheme()"><span id="themeText"><i class="fa-solid fa-moon"></i> Chế độ Tối</span></button>
+                <a href="settings.html" class="menu-item" style="text-decoration:none;display:block;"><i class="fa-solid fa-gear"></i> Cài đặt</a>
+                <button class="menu-item" id="btnLogout" style="color:#ef4444"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="settings-layout">
+        <!-- SUB-NAVBAR NGANG -->
+        <div class="settings-subnav" id="settingsSubnav">
+            <button type="button" class="settings-nav-item active" data-panel="account">
+                <i class="fa-solid fa-user-gear"></i>
+                <span>Tài khoản</span>
+            </button>
+            <button type="button" class="settings-nav-item" data-panel="appearance">
+                <i class="fa-solid fa-palette"></i>
+                <span>Giao diện</span>
+            </button>
+            <button type="button" class="settings-nav-item" data-panel="data">
+                <i class="fa-solid fa-database"></i>
+                <span>Dữ liệu</span>
+            </button>
+            <button type="button" class="settings-nav-item" data-panel="about">
+                <i class="fa-solid fa-circle-info"></i>
+                <span>Về WeClass</span>
+            </button>
+        </div>
+
+        <!-- NỘI DUNG -->
+        <main class="settings-content">
+            <!-- PANEL: TÀI KHOẢN -->
+            <section class="settings-panel active" id="panel-account">
+                <div class="settings-panel-header">
+                    <h2><i class="fa-solid fa-user-gear"></i> Quản lý tài khoản</h2>
+                    <p>Xem và cập nhật thông tin đăng nhập, bảo mật tài khoản.</p>
+                </div>
+
+                <div class="settings-card">
+                    <div class="settings-card-title"><i class="fa-solid fa-envelope"></i> Email đăng nhập</div>
+                    <div class="settings-row">
+                        <div class="settings-info-box">
+                            <span class="settings-label">Email hiện tại</span>
+                            <span class="settings-value" id="settingsEmail">—</span>
+                        </div>
+                    </div>
+                    <div class="settings-row" style="margin-top:14px;">
+
+                        <input type="email" id="newEmailInput" class="settings-input" placeholder="Email mới (tùy chọn)">
+                        <button type="button" class="btn-settings primary" id="btnUpdateEmail">
+                            <i class="fa-solid fa-pen"></i> Cập nhật email
+                        </button>
+                    </div>
+                    <p class="settings-hint">Sau khi đổi email, bạn có thể cần xác nhận qua hộp thư mới (nếu Supabase bật xác thực email).</p>
+                </div>
+
+                <div class="settings-card">
+                    <div class="settings-card-title"><i class="fa-solid fa-lock"></i> Đổi mật khẩu</div>
+                    <div class="settings-form-grid">
+                        <input type="password" id="newPassword" class="settings-input" placeholder="Mật khẩu mới (tối thiểu 6 ký tự)">
+                        <input type="password" id="confirmPassword" class="settings-input" placeholder="Nhập lại mật khẩu mới">
+                    </div>
+                    <button type="button" class="btn-settings primary" id="btnChangePassword" style="margin-top:12px;">
+                        <i class="fa-solid fa-key"></i> Đổi mật khẩu
+                    </button>
+                </div>
+
+                <div class="settings-card danger-zone">
+                    <div class="settings-card-title"><i class="fa-solid fa-triangle-exclamation"></i> Vùng nguy hiểm</div>
+                    <p class="settings-desc">Xóa tài khoản sẽ xóa toàn bộ lớp học, học sinh, điểm, điểm danh và lịch của bạn. Hành động không thể hoàn tác.</p>
+                    <button type="button" class="btn-settings danger" id="btnDeleteAccount">
+                        <i class="fa-solid fa-trash-can"></i> Xóa tài khoản
+                    </button>
+                </div>
+            </section>
+
+            <!-- PANEL: GIAO DIỆN -->
+            <section class="settings-panel" id="panel-appearance">
+                <div class="settings-panel-header">
+                    <h2><i class="fa-solid fa-palette"></i> Cài đặt giao diện</h2>
+                    <p>Tùy chỉnh màu sắc và chế độ hiển thị. Thay đổi áp dụng ngay và được lưu trên thiết bị này.</p>
+                </div>
+
+                <div class="settings-card">
+                    <div class="settings-card-title"><i class="fa-solid fa-moon"></i> Chế độ sáng / tối</div>
+                    <div class="theme-toggle-row">
+                        <button type="button" class="theme-option" data-theme-set="light" id="themeOptLight">
+                            <i class="fa-solid fa-sun"></i>
+                            <span>Sáng</span>
+                        </button>
+                        <button type="button" class="theme-option" data-theme-set="dark" id="themeOptDark">
+                            <i class="fa-solid fa-moon"></i>
+                            <span>Tối</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <div class="settings-card-title"><i class="fa-solid fa-droplet"></i> Màu chủ đạo</div>
+                    <p class="settings-desc">Chọn màu nhấn. Hệ thống tự điều chỉnh tông phù hợp cả chế độ sáng và tối.</p>
+                    <div class="color-presets" id="colorPresets">
+                        <button type="button" class="color-swatch" data-color="#6366f1" style="--swatch:#6366f1" title="Indigo"></button>
+                        <button type="button" class="color-swatch" data-color="#8b5cf6" style="--swatch:#8b5cf6" title="Tím"></button>
+                        <button type="button" class="color-swatch" data-color="#ec4899" style="--swatch:#ec4899" title="Hồng"></button>
+                        <button type="button" class="color-swatch" data-color="#f43f5e" style="--swatch:#f43f5e" title="Đỏ hồng"></button>
+                        <button type="button" class="color-swatch" data-color="#f59e0b" style="--swatch:#f59e0b" title="Cam"></button>
+                        <button type="button" class="color-swatch" data-color="#10b981" style="--swatch:#10b981" title="Xanh lục"></button>
+                        <button type="button" class="color-swatch" data-color="#06b6d4" style="--swatch:#06b6d4" title="Xanh cyan"></button>
+                        <button type="button" class="color-swatch" data-color="#3b82f6" style="--swatch:#3b82f6" title="Xanh dương"></button>
+                    </div>
+                    <div class="custom-color-row">
+                        <label for="customPrimary">Màu tùy chọn</label>
+                        <input type="color" id="customPrimary" value="#6366f1">
+                        <button type="button" class="btn-settings" id="btnApplyCustomColor">Áp dụng</button>
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <div class="settings-card-title"><i class="fa-solid fa-text-height"></i> Kích thước chữ</div>
+                    <div class="font-size-row">
+                        <button type="button" class="font-size-btn" data-size="normal">Bình thường</button>
+                        <button type="button" class="font-size-btn" data-size="large">Lớn hơn</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PANEL: DỮ LIỆU -->
+            <section class="settings-panel" id="panel-data">
+                <div class="settings-panel-header">
+                    <h2><i class="fa-solid fa-database"></i> Dữ liệu &amp; Sao lưu</h2>
+                    <p>Quản lý dữ liệu lớp học trên tài khoản của bạn.</p>
+                </div>
+
+                <div class="settings-card">
+                    <div class="settings-card-title"><i class="fa-solid fa-chart-simple"></i> Thống kê nhanh</div>
+                    <div class="stats-grid" id="settingsStats">
+                        <div class="stat-box">
+                            <span class="stat-num" id="statClasses">—</span>
+                            <span class="stat-label">Lớp học</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-num" id="statStudents">—</span>
+                            <span class="stat-label">Học sinh</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-settings" id="btnRefreshStats" style="margin-top:12px;">
+                        <i class="fa-solid fa-rotate"></i> Làm mới thống kê
+                    </button>
+                </div>
+
+                <div class="settings-card">
+                    <div class="settings-card-title"><i class="fa-solid fa-broom"></i> Dọn dẹp</div>
+                    <p class="settings-desc">Xóa toàn bộ lịch dạy (TKB) trên tài khoản, giữ nguyên lớp và học sinh.</p>
+                    <button type="button" class="btn-settings warning" id="btnClearSchedule">
+                        <i class="fa-solid fa-calendar-xmark"></i> Xóa toàn bộ TKB
+                    </button>
+                </div>
+            </section>
+
+            <!-- PANEL: VỀ -->
+            <section class="settings-panel" id="panel-about">
+                <div class="settings-panel-header">
+                    <h2><i class="fa-solid fa-circle-info"></i> Về WeClass</h2>
+                    <p>Nền tảng hỗ trợ giáo viên quản lý lớp học thông minh.</p>
+                </div>
+                <div class="settings-card">
+                    <div class="about-brand">
+                        <div class="about-logo">We<span>Class</span></div>
+                        <p>Quản lý lớp · Điểm danh · Học bạ điện tử · Thời khóa biểu · Đánh giá AI</p>
+                    </div>
+                    <ul class="about-list">
+                        <li><i class="fa-solid fa-check"></i> Hỗ trợ Cấp 1 &amp; Cấp 2 theo quy định</li>
+                        <li><i class="fa-solid fa-check"></i> Điểm danh theo ngày, lưu lịch sử</li>
+                        <li><i class="fa-solid fa-check"></i> Học bạ điện tử + nhận xét AI tham khảo</li>
+                        <li><i class="fa-solid fa-check"></i> Xuất Excel danh sách &amp; điểm</li>
+                        <li><i class="fa-solid fa-check"></i> Công cụ hẹn giờ / đếm giờ trên lớp</li>
+                    </ul>
+                    <p class="settings-hint" style="margin-top:16px;">Dữ liệu được lưu trên Supabase theo tài khoản của bạn. Chỉ mang tính hỗ trợ giảng dạy.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+</body>
+</html>

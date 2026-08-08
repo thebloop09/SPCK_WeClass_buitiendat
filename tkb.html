@@ -60,6 +60,7 @@
                 <a href="tkb.html" class="active">Thời khóa biểu</a>
                 <a href="class.html">Lớp học</a>
                 <a href="index.html">Giới thiệu</a>
+                <a href="settings.html" class="nav-settings-link" style="display:none;">Cài đặt</a>
                 <div class="dropdown-tools">
                     <button class="tools-btn" type="button">Công cụ</button>
                     <div class="tools-menu">
@@ -74,13 +75,13 @@
             <div class="dropdown-content" id="userDropdown">
                 <div class="dropdown-user-info"><b id="userEmailDisplay">...</b></div>
                 <button class="menu-item" onclick="toggleTheme()"><span id="themeText"><i class="fa-solid fa-moon"></i> Chế độ Tối</span></button>
+                <a href="settings.html" class="menu-item" style="text-decoration:none;display:block;"><i class="fa-solid fa-gear"></i> Cài đặt</a>
                 <button class="menu-item" id="btnLogout" style="color:#ef4444"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
             </div>
         </div>
     </nav>
 
     <div class="container" style="max-width: 1200px;">
-        <!-- TKB TRÊN TRƯỜNG -->
         <div class="card" style="margin-bottom: 2rem; align-items: stretch; text-align: left;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h2><i class="fa-solid fa-school"></i> Thời Khóa Biểu Trên Trường (5 Tiết)</h2>
@@ -100,13 +101,11 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- Tự động sinh bởi app.js -->
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- TKB DẠY THÊM -->
         <div class="card" style="align-items: stretch; text-align: left;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h2><i class="fa-solid fa-pen-to-square"></i> Lịch Dạy Thêm (2 Ca)</h2>
@@ -126,7 +125,6 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- Tự động sinh bởi app.js -->
                     </tbody>
                 </table>
             </div>

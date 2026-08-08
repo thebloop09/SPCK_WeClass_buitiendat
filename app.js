@@ -2059,14 +2059,15 @@ function initSettingsPage() {
 
     document.getElementById('btnDeleteAccount')?.addEventListener('click', async () => {
         if (!currentUser) return;
-        const ok = confirm('Bạn chắc chắn muốn XÓA TÀI KHOẢN?\n\nToàn bộ lớp, học sinh, điểm, điểm danh, lịch sẽ bị xóa vĩnh viễn.\nHành động không thể hoàn tác.');
+        const ok = confirm('Bạn chắc chắn muốn XÓA TÀI KHOẢN?\n\nToàn bộ lớp, học sinh, điểm, điểm danh, lịch và tài khoản đăng nhập sẽ bị xóa vĩnh viễn trên Supabase.\nHành động không thể hoàn tác.');
         if (!ok) return;
         const confirmText = prompt('Nhập "XOA" (viết hoa) để xác nhận:');
         if (confirmText !== 'XOA') return alert('Đã hủy.');
 
         try {
             const uid = currentUser.id;
-            // Xóa dữ liệu theo user (schedule, classes -> students/grades cascade nếu có FK)
+
+            // 1) Xóa dữ liệu app
             await _supabase.from('schedule').delete().eq('user_id', uid);
             const { data: classes } = await _supabase.from('classes').select('id').eq('user_id', uid);
             const classIds = (classes || []).map(c => c.id);
@@ -2080,9 +2081,45 @@ function initSettingsPage() {
                 }
                 await _supabase.from('classes').delete().eq('user_id', uid);
             }
-            // Không thể xóa auth.users bằng anon key; đăng xuất sau khi xóa dữ liệu
+
+            // 2) Gọi Edge Function — URL thực tế trên Dashboard của bạn là /functions/v1/super-action
+            let authDeleted = false;
+            let edgeMsg = '';
+            try {
+                const { data: sess } = await _supabase.auth.getSession();
+                const accessToken = sess?.session?.access_token;
+                if (!accessToken) {
+                    edgeMsg = 'Không lấy được access token';
+                } else {
+                    const res = await fetch(SUPABASE_URL + '/functions/v1/super-action', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + accessToken,
+                            'apikey': SUPABASE_KEY,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ confirm: true })
+                    });
+                    const bodyText = await res.text().catch(() => '');
+                    if (res.ok) {
+                        authDeleted = true;
+                    } else {
+                        edgeMsg = 'HTTP ' + res.status + ' — ' + bodyText;
+                        console.warn('Edge super-action failed:', edgeMsg);
+                    }
+                }
+            } catch (fnErr) {
+                edgeMsg = String(fnErr);
+                console.warn('Edge function error:', fnErr);
+            }
+
             await _supabase.auth.signOut();
-            alert('Đã xóa toàn bộ dữ liệu lớp học và đăng xuất.\nLưu ý: Tài khoản đăng nhập vẫn có thể tồn tại phía máy chủ (cần admin xóa hoàn toàn nếu cần).');
+
+            if (authDeleted) {
+                alert('Đã xóa toàn bộ dữ liệu và tài khoản trên Supabase.');
+            } else {
+                alert('Đã xóa dữ liệu lớp học và đăng xuất.\n\nChưa xóa được tài khoản auth.\nChi tiết: ' + (edgeMsg || 'không rõ') + '\n\nKiểm tra tab Code của function super-action đã dán code xóa user chưa.');
+            }
             window.location.href = 'index.html';
         } catch (e) {
             console.error(e);

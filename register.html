@@ -6,19 +6,33 @@
     <title>Đăng ký WeClass</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body style="display: flex; align-items: center; justify-content: center; min-height: 100vh;">
-    <div class="card" style="max-width: 400px; width: 90%;">
-        <div class="logo" style="font-size: 2rem;">We<span>Class</span></div>
-        <p style="color: var(--text-sub);">Tạo tài khoản mới để quản lý lớp học</p>
-        
-        <!-- Lưu ý ID phải chính xác là email, password, btnRegister -->
-        <input type="email" id="email" placeholder="Nhập Email của bạn">
-        <input type="password" id="password" placeholder="Mật khẩu (ít nhất 6 ký tự)">
-        
-        <button id="btnRegister">Đăng ký ngay</button>
-        
-        <p>Đã có tài khoản? <a href="login.html" style="color: var(--primary); text-decoration: none; font-weight: 700;">Đăng nhập</a></p>
-    </div>
+<body class="auth-page auth-register">
+    <main class="auth-shell">
+        <section class="auth-intro">
+            <a class="auth-logo" href="index.html">We<span>Class</span></a>
+            <div class="auth-kicker">Bắt đầu một nhịp dạy mới</div>
+            <h1>Lớp học của bạn,<br><strong>trong tầm tay.</strong></h1>
+            <p class="auth-lead">Một tài khoản nhỏ, một không gian đủ đầy để bạn quản lý công việc mỗi ngày.</p>
+            <div class="auth-feature-row"><span>01</span><b>Gọn gàng</b><small>Mọi lớp học ở một nơi</small></div>
+            <div class="auth-feature-row"><span>02</span><b>Chủ động</b><small>Điểm danh nhanh, dữ liệu rõ</small></div>
+        </section>
+        <section class="auth-panel">
+            <div class="auth-panel-top"><span>WECLASS / Đăng ký</span><span class="status-light">● Bắt đầu</span></div>
+            <div class="auth-heading">
+                <span class="auth-eyebrow">Chào bạn</span>
+                <h2>Tạo không gian<br>lớp học riêng</h2>
+                <p>Đăng ký miễn phí trong vài giây.</p>
+            </div>
+            <form class="auth-form" onsubmit="return false;">
+                <label for="email">Email giáo viên</label>
+                <input type="email" id="email" placeholder="ten@truonghoc.vn">
+                <label for="password">Mật khẩu</label>
+                <input type="password" id="password" placeholder="Ít nhất 6 ký tự">
+                <button id="btnRegister" type="button">Tạo tài khoản <span>→</span></button>
+            </form>
+            <p class="auth-switch">Đã có tài khoản? <a href="login.html">Đăng nhập ngay</a></p>
+        </section>
+    </main>
 
     <!-- Phải có 2 dòng script này -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

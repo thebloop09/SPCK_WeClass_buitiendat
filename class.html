@@ -14,6 +14,7 @@
             <div class="nav-links">
                 <a href="tkb.html">Thời khóa biểu</a>
                 <a href="class.html" class="active">Lớp học</a>
+                <a href="stats.html" >Thống kê</a>
                 <a href="index.html">Giới thiệu</a>
                 <a href="settings.html" class="nav-settings-link" style="display:none;">Cài đặt</a>
                 <div class="dropdown-tools">
@@ -37,11 +38,16 @@
         </div>
     </nav>
 
-    <div class="container">
         <div id="class-section">
-            <div class="card" style="padding:2rem; margin-bottom:2rem">
-                <h2><i class="fa-solid fa-hand-wave"></i> Lớp học của bạn</h2>
-                <div style="display:flex; gap:10px; width:100%; max-width:560px; flex-wrap:wrap;">
+            <div class="class-header-layout">
+                <div class="class-date-badge" id="classTodayBadge">
+                    <span class="class-date-weekday" id="classTodayWeekday">—</span>
+                    <span class="class-date-ymd" id="classTodayYmd">—</span>
+                </div>
+                <div class="card class-header-card" style="padding:2rem; margin-bottom:2rem; align-items:stretch; text-align:left;">
+                    <div class="class-header-main">
+                        <h2 style="margin:0;"><i class="fa-solid fa-hand-wave"></i> Lớp học của bạn</h2>
+                        <div class="class-create-controls" style="display:flex; gap:10px; width:100%; max-width:560px; flex-wrap:wrap; margin-top:12px;">
                     <input type="text" id="className" placeholder="Tên lớp mới..." style="flex:1; min-width:160px;">
                     <select id="classGrade" style="width:140px; padding:14px 12px; border-radius:20px; border:2px solid transparent; background:var(--input-bg); color:var(--text-main); font-weight:600; font-size:0.95rem; cursor:pointer;">
                         <option value="1">Khối 1 (Cấp 1)</option>
@@ -55,15 +61,16 @@
                         <option value="9">Khối 9 (Cấp 2)</option>
                     </select>
                     <button id="btnAddClass" style="width:auto" type="button">Tạo</button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div id="class-list" class="grid-classes"></div>
+                <div id="class-list" class="grid-classes class-list-grid"></div>
         </div>
-
         <div id="student-section" class="hidden">
-            <button onclick="showClasses()" style="margin-bottom:1rem; background:var(--border); color:var(--text-main); width:auto" type="button">← Trở về</button>
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px;">
+            <div class="student-layout">
                 <div class="card">
+                    <button class="back-to-classes" onclick="showClasses()" type="button">← Trở về</button>
                     <h2 id="current-class-title">...</h2>
                     <div id="random-result" style="font-size:1.6rem; color:var(--primary); font-weight:800; min-height:80px; display:flex; flex-direction:column; justify-content:center; align-items:center;"><i class="fa-solid fa-dice"></i> ???</div>
                     <button id="btnRandom" type="button">Gọi STT ngẫu nhiên</button>

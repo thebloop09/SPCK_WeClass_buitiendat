@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Thống kê - WeClass</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <nav>
+        <div class="nav-left">
+            <a href="index.html" class="logo">We<span>Class</span></a>
+            <div class="nav-links">
+                <a href="tkb.html">Thời khóa biểu</a>
+                <a href="class.html">Lớp học</a>
+                <a href="stats.html" class="active nav-stats-link">Thống kê</a>
+                <a href="index.html">Giới thiệu</a>
+                <a href="settings.html" class="nav-settings-link" style="display:none;">Cài đặt</a>
+                <div class="dropdown-tools">
+                    <button class="tools-btn" type="button">Công cụ</button>
+                    <div class="tools-menu">
+                        <button class="menu-item" type="button" onclick="openTimerModal()"><i class="fa-solid fa-clock"></i> Hẹn giờ</button>
+                        <button class="menu-item" type="button" onclick="openStopwatchModal()"><i class="fa-solid fa-stopwatch"></i> Đếm giờ</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="user-menu" id="userMenu" style="display: none;">
+            <div class="avatar-btn" id="avatarBtn">U</div>
+            <div class="dropdown-content" id="userDropdown">
+                <div class="dropdown-user-info"><b id="userEmailDisplay">...</b></div>
+                <button class="menu-item" onclick="toggleTheme()"><span id="themeText"><i class="fa-solid fa-moon"></i> Chế độ Tối</span></button>
+                <a href="settings.html" class="menu-item" style="text-decoration:none;display:block;"><i class="fa-solid fa-gear"></i> Cài đặt</a>
+                <button class="menu-item" id="btnLogout" style="color:#ef4444"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container stats-page">
+        <div class="card stats-header-card" style="align-items:stretch; text-align:left; margin-bottom:1.25rem;">
+            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px;">
+                <div>
+                    <h2 style="margin:0; display:flex; align-items:center; gap:10px;">
+                        <i class="fa-solid fa-chart-column" style="color:var(--primary);"></i>
+                        Thống kê theo lớp
+                    </h2>
+                    <p style="color:var(--text-sub); margin:6px 0 0; font-size:0.9rem;">
+                        Mỗi cột = 1 lớp. Di chuột vào cột để xem tên lớp. Dữ liệu lấy từ học bạ &amp; điểm thi đua trên Supabase.
+                    </p>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <span id="statsLastUpdated" class="stats-updated">Chưa tải</span>
+                    <button type="button" id="btnRefreshStatsCharts" class="btn-settings primary" style="width:auto;">
+                        <i class="fa-solid fa-rotate"></i> Làm mới
+                    </button>
+                </div>
+            </div>
+            <div id="statsSummaryBar" class="stats-summary-bar"></div>
+        </div>
+
+        <div class="stats-charts-grid">
+            <div class="card stats-chart-card">
+                <div class="stats-chart-title">
+                    <i class="fa-solid fa-book"></i> Điểm trung bình HK1 · HK2 · Cả năm
+                </div>
+                <p class="stats-chart-desc">Trục Y: thang điểm 0–10. Mỗi nhóm cột tương ứng một lớp.</p>
+                <div class="stats-chart-wrap">
+                    <canvas id="chartScores"></canvas>
+                </div>
+                <div id="statsScoresEmpty" class="stats-empty hidden">Chưa có lớp hoặc chưa có điểm học bạ để hiển thị.</div>
+            </div>
+
+            <div class="card stats-chart-card">
+                <div class="stats-chart-title">
+                    <i class="fa-solid fa-plus"></i> Điểm thi đua trung bình (+)
+                </div>
+                <p class="stats-chart-desc">Trung bình điểm cộng/trừ của học sinh trong từng lớp.</p>
+                <div class="stats-chart-wrap">
+                    <canvas id="chartPoints"></canvas>
+                </div>
+                <div id="statsPointsEmpty" class="stats-empty hidden">Chưa có lớp để hiển thị điểm thi đua.</div>
+            </div>
+        </div>
+
+        <div class="card stats-table-card" style="align-items:stretch; text-align:left; margin-top:1.25rem;">
+            <div class="stats-chart-title" style="margin-bottom:12px;">
+                <i class="fa-solid fa-table"></i> Bảng chi tiết theo lớp
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="stats-detail-table" id="statsDetailTable">
+                    <thead>
+                        <tr>
+                            <th>Lớp</th>
+                            <th>Khối</th>
+                            <th>Sĩ số</th>
+                            <th>ĐTB HK1</th>
+                            <th>ĐTB HK2</th>
+                            <th>ĐTB cả năm</th>
+                            <th>Điểm + TB</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statsDetailBody">
+                        <tr><td colspan="7" style="text-align:center; color:var(--text-sub);">Đang tải...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+        <script>
+(function(){if(!window.chatbase||window.chatbase("getState")!=="initialized"){window.chatbase=(...arguments)=>{if(!window.chatbase.q){window.chatbase.q=[]}window.chatbase.q.push(arguments)};window.chatbase=new Proxy(window.chatbase,{get(target,prop){if(prop==="q"){return target.q}return(...args)=>target(prop,...args)}})}const onLoad=function(){const script=document.createElement("script");script.src="https://www.chatbase.co/embed.min.js";script.id="RG8HuWhTNZVjVIDXfdEzL";script.domain="www.chatbase.co";document.body.appendChild(script)};if(document.readyState==="complete"){onLoad()}else{window.addEventListener("load",onLoad)}})();
+</script>
+</body>
+</html>

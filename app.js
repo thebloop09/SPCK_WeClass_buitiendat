@@ -2179,3 +2179,530 @@ async function loadSettingsStats() {
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     try { loadAppearanceSettings(); } catch (_) {}
 }
+// ============================================================
+// THỐNG KÊ THEO LỚP (Chart.js) — stats.html
+// ============================================================
+
+let _statsChartScores = null;
+let _statsChartPoints = null;
+let _statsRefreshTimer = null;
+let _statsLoading = false;
+let _statsPageInited = false;
+
+function meanOf(arr) {
+    if (!arr || !arr.length) return null;
+    const sum = arr.reduce(function (a, b) { return a + b; }, 0);
+    return round1(sum / arr.length);
+}
+
+function computeStudentPeriodAvgs(gradeMap, gradeLevel) {
+    const isPrimary = isPrimaryGrade(Number(gradeLevel) || 1);
+    const subjects = Object.keys(gradeMap || {});
+    if (!subjects.length) {
+        return { hk1: null, hk2: null, year: null };
+    }
+
+    const hk1List = [];
+    const hk2List = [];
+    const yearList = [];
+
+    subjects.forEach(function (sub) {
+        const scores = gradeMap[sub] || {};
+
+        if (isPrimary) {
+            const gk1 = parseScore(scores.gk1);
+            const ck1 = parseScore(scores.ck1);
+            const gk2 = parseScore(scores.gk2);
+            const ck2 = parseScore(scores.ck2);
+
+            const s1 = [];
+            if (gk1 !== null) s1.push(gk1);
+            if (ck1 !== null) s1.push(ck1);
+            const s2 = [];
+            if (gk2 !== null) s2.push(gk2);
+            if (ck2 !== null) s2.push(ck2);
+
+            if (s1.length) hk1List.push(round1(s1.reduce(function (a, b) { return a + b; }, 0) / s1.length));
+            if (s2.length) hk2List.push(round1(s2.reduce(function (a, b) { return a + b; }, 0) / s2.length));
+
+            const all = s1.concat(s2);
+            const storedMon = parseScore(scores.dtb_mon);
+            if (storedMon !== null) yearList.push(storedMon);
+            else if (all.length) yearList.push(round1(all.reduce(function (a, b) { return a + b; }, 0) / all.length));
+        } else {
+            let d1 = parseScore(scores.dtb_hk1);
+            let d2 = parseScore(scores.dtb_hk2);
+            let dy = parseScore(scores.dtb_cn);
+            if (d1 === null) d1 = calcSemesterAvg(scores, 'gk1', 'ck1');
+            if (d2 === null) d2 = calcSemesterAvg(scores, 'gk2', 'ck2');
+            if (dy === null) dy = calcYearAvg(d1, d2);
+            if (d1 !== null) hk1List.push(d1);
+            if (d2 !== null) hk2List.push(d2);
+            if (dy !== null) yearList.push(dy);
+        }
+    });
+
+    return {
+        hk1: meanOf(hk1List),
+        hk2: meanOf(hk2List),
+        year: meanOf(yearList)
+    };
+}
+
+async function fetchClassStatsData() {
+    if (!currentUser) return [];
+
+    const { data: classes, error: cErr } = await _supabase
+        .from('classes')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('name', { ascending: true });
+
+    if (cErr) {
+        console.error('stats classes:', cErr);
+        return [];
+    }
+    if (!classes || !classes.length) return [];
+
+    const classIds = classes.map(function (c) { return c.id; });
+
+    const { data: students, error: sErr } = await _supabase
+        .from('students')
+        .select('id, class_id, name, points, student_number')
+        .in('class_id', classIds);
+
+    if (sErr) console.error('stats students:', sErr);
+
+    const studentsByClass = {};
+    const allStudentIds = [];
+    (students || []).forEach(function (st) {
+        const cid = String(st.class_id);
+        if (!studentsByClass[cid]) studentsByClass[cid] = [];
+        studentsByClass[cid].push(st);
+        allStudentIds.push(st.id);
+    });
+
+    let gradeRows = [];
+    if (allStudentIds.length) {
+        const chunkSize = 200;
+        for (let i = 0; i < allStudentIds.length; i += chunkSize) {
+            const chunk = allStudentIds.slice(i, i + chunkSize);
+            const { data, error } = await _supabase
+                .from('grades')
+                .select('student_id, subject, score_key, score_value')
+                .in('student_id', chunk);
+            if (error) console.warn('stats grades chunk:', error);
+            if (data) gradeRows = gradeRows.concat(data);
+        }
+    }
+
+    const gradeMapByStudent = {};
+    gradeRows.forEach(function (r) {
+        const sid = String(r.student_id);
+        if (!gradeMapByStudent[sid]) gradeMapByStudent[sid] = {};
+        if (!gradeMapByStudent[sid][r.subject]) gradeMapByStudent[sid][r.subject] = {};
+        gradeMapByStudent[sid][r.subject][r.score_key] = r.score_value;
+    });
+
+    return classes.map(function (cls) {
+        const grade = Number(cls.grade_level) || 1;
+        const stList = studentsByClass[String(cls.id)] || [];
+        const studentHk1 = [];
+        const studentHk2 = [];
+        const studentYear = [];
+        const pointsList = [];
+
+        stList.forEach(function (st) {
+            pointsList.push(Number(st.points) || 0);
+            const gmap = gradeMapByStudent[String(st.id)] || {};
+            const av = computeStudentPeriodAvgs(gmap, grade);
+            if (av.hk1 !== null) studentHk1.push(av.hk1);
+            if (av.hk2 !== null) studentHk2.push(av.hk2);
+            if (av.year !== null) studentYear.push(av.year);
+        });
+
+        return {
+            id: cls.id,
+            name: cls.name || ('Lớp ' + cls.id),
+            grade: grade,
+            studentCount: stList.length,
+            avgHk1: meanOf(studentHk1),
+            avgHk2: meanOf(studentHk2),
+            avgYear: meanOf(studentYear),
+            avgPoints: pointsList.length
+                ? round1(pointsList.reduce(function (a, b) { return a + b; }, 0) / pointsList.length)
+                : null
+        };
+    });
+}
+
+function chartThemeColors() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return {
+        text: isDark ? '#94a3b8' : '#64748b',
+        grid: isDark ? 'rgba(148,163,184,0.15)' : 'rgba(100,116,139,0.15)',
+        tooltipBg: isDark ? '#1e293b' : '#ffffff',
+        tooltipText: isDark ? '#f1f5f9' : '#1e293b',
+        border: isDark ? '#334155' : '#e2e8f0'
+    };
+}
+
+function destroyStatsCharts() {
+    if (_statsChartScores) {
+        try { _statsChartScores.destroy(); } catch (_) {}
+        _statsChartScores = null;
+    }
+    if (_statsChartPoints) {
+        try { _statsChartPoints.destroy(); } catch (_) {}
+        _statsChartPoints = null;
+    }
+}
+
+function renderStatsCharts(rows) {
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js chưa tải');
+        return;
+    }
+
+    const canvasScores = document.getElementById('chartScores');
+    const canvasPoints = document.getElementById('chartPoints');
+    if (!canvasScores || !canvasPoints) return;
+
+    const emptyScores = document.getElementById('statsScoresEmpty');
+    const emptyPoints = document.getElementById('statsPointsEmpty');
+
+    destroyStatsCharts();
+
+    if (!rows.length) {
+        if (emptyScores) emptyScores.classList.remove('hidden');
+        if (emptyPoints) emptyPoints.classList.remove('hidden');
+        canvasScores.style.display = 'none';
+        canvasPoints.style.display = 'none';
+        return;
+    }
+
+    if (emptyScores) emptyScores.classList.add('hidden');
+    if (emptyPoints) emptyPoints.classList.add('hidden');
+    canvasScores.style.display = '';
+    canvasPoints.style.display = '';
+
+    const theme = chartThemeColors();
+    const shortLabels = rows.map(function (r) {
+        const n = r.name || '';
+        return n.length > 12 ? (n.slice(0, 11) + '…') : n;
+    });
+
+    const hk1Data = rows.map(function (r) { return r.avgHk1; });
+    const hk2Data = rows.map(function (r) { return r.avgHk2; });
+    const yearData = rows.map(function (r) { return r.avgYear; });
+    const pointsData = rows.map(function (r) { return r.avgPoints; });
+
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    color: theme.text,
+                    boxWidth: 12,
+                    padding: 14,
+                    font: { family: "'Plus Jakarta Sans', sans-serif", weight: '600', size: 11 }
+                }
+            },
+            tooltip: {
+                backgroundColor: theme.tooltipBg,
+                titleColor: theme.tooltipText,
+                bodyColor: theme.tooltipText,
+                borderColor: theme.border,
+                borderWidth: 1,
+                padding: 12,
+                titleFont: { weight: '800', size: 13 },
+                bodyFont: { size: 12 },
+                callbacks: {
+                    title: function (items) {
+                        if (!items.length) return '';
+                        const idx = items[0].dataIndex;
+                        const row = rows[idx];
+                        return row ? (row.name + ' · Khối ' + row.grade + ' · ' + row.studentCount + ' HS') : '';
+                    },
+                    label: function (ctx) {
+                        const v = ctx.parsed.y;
+                        const val = (v === null || v === undefined) ? '—' : Number(v).toFixed(1);
+                        return ' ' + ctx.dataset.label + ': ' + val;
+                    }
+                }
+            }
+        },
+        scales: {
+            x: {
+                ticks: {
+                    color: theme.text,
+                    maxRotation: 40,
+                    minRotation: 0,
+                    font: { size: 11, weight: '600' }
+                },
+                grid: { display: false }
+            },
+            y: {
+                beginAtZero: true,
+                ticks: { color: theme.text, font: { size: 11 } },
+                grid: { color: theme.grid }
+            }
+        }
+    };
+
+    _statsChartScores = new Chart(canvasScores.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: shortLabels,
+            datasets: [
+                {
+                    label: 'ĐTB HK1',
+                    data: hk1Data,
+                    backgroundColor: 'rgba(99, 102, 241, 0.75)',
+                    borderColor: 'rgba(99, 102, 241, 1)',
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    maxBarThickness: 28
+                },
+                {
+                    label: 'ĐTB HK2',
+                    data: hk2Data,
+                    backgroundColor: 'rgba(16, 185, 129, 0.75)',
+                    borderColor: 'rgba(16, 185, 129, 1)',
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    maxBarThickness: 28
+                },
+                {
+                    label: 'ĐTB cả năm',
+                    data: yearData,
+                    backgroundColor: 'rgba(245, 158, 11, 0.8)',
+                    borderColor: 'rgba(245, 158, 11, 1)',
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    maxBarThickness: 28
+                }
+            ]
+        },
+        options: Object.assign({}, commonOptions, {
+            scales: {
+                x: commonOptions.scales.x,
+                y: Object.assign({}, commonOptions.scales.y, {
+                    suggestedMax: 10,
+                    max: 10
+                })
+            }
+        })
+    });
+
+    const pointColors = pointsData.map(function (v) {
+        if (v === null || v === undefined) return 'rgba(148,163,184,0.5)';
+        if (v > 0) return 'rgba(16, 185, 129, 0.8)';
+        if (v < 0) return 'rgba(239, 68, 68, 0.8)';
+        return 'rgba(148, 163, 184, 0.6)';
+    });
+
+    _statsChartPoints = new Chart(canvasPoints.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: shortLabels,
+            datasets: [
+                {
+                    label: 'Điểm + TB',
+                    data: pointsData,
+                    backgroundColor: pointColors,
+                    borderColor: pointColors.map(function (c) {
+                        return c.replace('0.8', '1').replace('0.6', '1').replace('0.5', '1');
+                    }),
+                    borderWidth: 1,
+                    borderRadius: 10,
+                    maxBarThickness: 36
+                }
+            ]
+        },
+        options: Object.assign({}, commonOptions, {
+            plugins: Object.assign({}, commonOptions.plugins, {
+                legend: { display: false }
+            })
+        })
+    });
+}
+
+function renderStatsTable(rows) {
+    const tbody = document.getElementById('statsDetailBody');
+    if (!tbody) return;
+
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-sub);">Chưa có lớp nào.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = rows.map(function (r) {
+        const pts = r.avgPoints;
+        let ptsHtml = '—';
+        if (pts !== null && pts !== undefined) {
+            const cls = pts > 0 ? 'pos' : pts < 0 ? 'neg' : 'muted';
+            const txt = pts > 0 ? ('+' + pts.toFixed(1)) : pts.toFixed(1);
+            ptsHtml = '<span class="' + cls + '">' + txt + '</span>';
+        }
+        return (
+            '<tr>' +
+            '<td><b>' + String(r.name || '').replace(/</g, '&lt;') + '</b></td>' +
+            '<td>' + r.grade + '</td>' +
+            '<td>' + r.studentCount + '</td>' +
+            '<td>' + (r.avgHk1 != null ? r.avgHk1.toFixed(1) : '<span class="muted">—</span>') + '</td>' +
+            '<td>' + (r.avgHk2 != null ? r.avgHk2.toFixed(1) : '<span class="muted">—</span>') + '</td>' +
+            '<td>' + (r.avgYear != null ? r.avgYear.toFixed(1) : '<span class="muted">—</span>') + '</td>' +
+            '<td>' + ptsHtml + '</td>' +
+            '</tr>'
+        );
+    }).join('');
+}
+
+function renderStatsSummary(rows) {
+    const bar = document.getElementById('statsSummaryBar');
+    if (!bar) return;
+    const nClass = rows.length;
+    const nStudents = rows.reduce(function (a, r) { return a + (r.studentCount || 0); }, 0);
+    const years = rows.map(function (r) { return r.avgYear; }).filter(function (v) { return v != null; });
+    const overallYear = meanOf(years);
+    const pts = rows.map(function (r) { return r.avgPoints; }).filter(function (v) { return v != null; });
+    const overallPts = pts.length
+        ? round1(pts.reduce(function (a, b) { return a + b; }, 0) / pts.length)
+        : null;
+
+    bar.innerHTML =
+        '<span class="stats-pill"><i class="fa-solid fa-chalkboard"></i> Lớp: <span class="num">' + nClass + '</span></span>' +
+        '<span class="stats-pill"><i class="fa-solid fa-users"></i> Học sinh: <span class="num">' + nStudents + '</span></span>' +
+        '<span class="stats-pill"><i class="fa-solid fa-star"></i> ĐTB cả năm (TB các lớp): <span class="num">' +
+        (overallYear != null ? overallYear.toFixed(1) : '—') + '</span></span>' +
+        '<span class="stats-pill"><i class="fa-solid fa-plus"></i> Điểm + TB: <span class="num">' +
+        (overallPts != null ? (overallPts > 0 ? '+' : '') + overallPts.toFixed(1) : '—') + '</span></span>';
+}
+
+window.loadStatsPage = async function () {
+    if (!window.location.pathname.includes('stats.html')) return;
+    if (!currentUser) return;
+    if (_statsLoading) return;
+    _statsLoading = true;
+
+    const btn = document.getElementById('btnRefreshStatsCharts');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...';
+    }
+
+    try {
+        const rows = await fetchClassStatsData();
+        renderStatsSummary(rows);
+        renderStatsCharts(rows);
+        renderStatsTable(rows);
+
+        const el = document.getElementById('statsLastUpdated');
+        if (el) {
+            const now = new Date();
+            el.textContent = 'Cập nhật: ' + now.toLocaleTimeString('vi-VN') + ' · ' + now.toLocaleDateString('vi-VN');
+        }
+    } catch (e) {
+        console.error('loadStatsPage', e);
+        const tbody = document.getElementById('statsDetailBody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#ef4444;">Lỗi tải thống kê: ' +
+                String(e.message || e).replace(/</g, '&lt;') + '</td></tr>';
+        }
+    } finally {
+        _statsLoading = false;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Làm mới';
+        }
+    }
+};
+
+function initStatsPage() {
+    if (!window.location.pathname.includes('stats.html')) return;
+
+    if (!_statsPageInited) {
+        _statsPageInited = true;
+        document.getElementById('btnRefreshStatsCharts')?.addEventListener('click', function () {
+            loadStatsPage();
+        });
+
+        if (_statsRefreshTimer) clearInterval(_statsRefreshTimer);
+        _statsRefreshTimer = setInterval(function () {
+            if (document.visibilityState === 'visible' && currentUser) {
+                loadStatsPage();
+            }
+        }, 45000);
+
+        const observer = new MutationObserver(function (mutations) {
+            mutations.forEach(function (m) {
+                if (m.attributeName === 'data-theme') {
+                    loadStatsPage();
+                }
+            });
+        });
+        observer.observe(document.documentElement, { attributes: true });
+    }
+
+    loadStatsPage();
+}
+
+(function patchApplyUserSessionForStats() {
+    const _prev = applyUserSession;
+    applyUserSession = function (user) {
+        _prev(user);
+        document.querySelectorAll('.nav-stats-link').forEach(function (el) {
+            el.style.display = user ? '' : 'none';
+        });
+        if (window.location.pathname.includes('stats.html')) {
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+            initStatsPage();
+        }
+    };
+})();
+// --- HIỂN THỊ THỨ + NGÀY TRÊN TRANG LỚP HỌC ---
+function getVietnameseWeekday(date) {
+    const names = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+    return names[date.getDay()];
+}
+
+function formatDateDMY(date) {
+    const d = String(date.getDate()).padStart(2, '0');
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const y = date.getFullYear();
+    return d + '/' + m + '/' + y;
+}
+
+window.updateClassTodayBadge = function () {
+    const elW = document.getElementById('classTodayWeekday');
+    const elD = document.getElementById('classTodayYmd');
+    if (!elW && !elD) return;
+    const now = new Date();
+    if (elW) elW.textContent = getVietnameseWeekday(now);
+    if (elD) elD.textContent = formatDateDMY(now);
+};
+
+(function initClassTodayBadge() {
+    function run() {
+        updateClassTodayBadge();
+        const now = new Date();
+        const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 2);
+        const ms = Math.max(1000, next - now);
+        setTimeout(function () {
+            updateClassTodayBadge();
+            setInterval(updateClassTodayBadge, 60 * 60 * 1000);
+        }, ms);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run);
+    } else {
+        run();
+    }
+})();

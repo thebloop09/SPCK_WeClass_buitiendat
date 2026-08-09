@@ -102,20 +102,23 @@ function applyUserSession(user) {
 
     if (user) {
         if (authButtons) authButtons.style.display = 'none';
-        if (userMenu) userMenu.style.display = 'block';
+        if (userMenu) userMenu.style.display = 'flex';
         if (userEmailDisplay) userEmailDisplay.innerText = user.email;
 
         if (btnAvatar) {
             btnAvatar.innerText = user.email[0].toUpperCase();
             btnAvatar.onclick = (e) => {
                 e.stopPropagation();
+                closeNotificationPanel();
                 document.getElementById('userDropdown')?.classList.toggle('show');
             };
         }
 
         loadClasses();
         loadSchedule();
+        startNotificationServices();
     } else {
+        stopNotificationServices();
         if (authButtons) authButtons.style.display = 'flex';
         if (userMenu) userMenu.style.display = 'none';
 
@@ -123,6 +126,278 @@ function applyUserSession(user) {
             window.location.href = 'login.html';
         }
     }
+}
+
+
+// ============================================================
+// THÔNG BÁO WECLASS - SUPABASE
+// ============================================================
+let notificationsRealtimeChannel = null;
+let notificationsPollTimer = null;
+let notificationsLoadedOnce = false;
+
+function notificationEscape(value) {
+    return String(value ?? '').replace(/[&<>\"']/g, function (c) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#039;' })[c];
+    });
+}
+
+function notificationDateParts(value) {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return { time: '', date: '' };
+
+    // Luôn hiển thị theo múi giờ Việt Nam, không phụ thuộc timezone của máy/server.
+    const tz = 'Asia/Ho_Chi_Minh';
+    return {
+        time: new Intl.DateTimeFormat('vi-VN', {
+            timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false
+        }).format(d),
+        date: new Intl.DateTimeFormat('vi-VN', {
+            timeZone: tz, day: '2-digit', month: '2-digit', year: 'numeric'
+        }).format(d)
+    };
+}
+
+function ensureNotificationUI() {
+    const userMenu = document.getElementById('userMenu') || document.querySelector('.user-menu');
+    if (!userMenu || document.getElementById('notificationBtn')) return;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'notification-wrap';
+    wrap.innerHTML = `
+        <button type="button" class="notification-btn" id="notificationBtn" aria-label="Thông báo" title="Thông báo">
+            <i class="fa-solid fa-bell"></i>
+            <span class="notification-dot" id="notificationDot"></span>
+            <span class="notification-count" id="notificationCount">0</span>
+        </button>
+        <div class="notification-panel" id="notificationPanel" aria-hidden="true">
+            <div class="notification-panel-head">
+                <div>
+                    <div class="notification-panel-title"><i class="fa-solid fa-bell"></i> Thông báo</div>
+                    <div class="notification-panel-sub" id="notificationSub">Đang tải...</div>
+                </div>
+                <button type="button" class="notification-close" id="notificationClose" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="notification-list" id="notificationList">
+                <div class="notification-empty"><i class="fa-regular fa-bell-slash"></i><b>Chưa có thông báo</b><span>Mọi cập nhật quan trọng sẽ xuất hiện ở đây.</span></div>
+            </div>
+        </div>`;
+
+    // Chèn ngay trước avatar để nằm cạnh avatar.
+    const avatar = userMenu.querySelector('#avatarBtn');
+    if (avatar) userMenu.insertBefore(wrap, avatar);
+    else userMenu.appendChild(wrap);
+
+    const btn = document.getElementById('notificationBtn');
+    btn.addEventListener('click', async function (e) {
+        e.stopPropagation();
+        const panel = document.getElementById('notificationPanel');
+        const isOpen = panel?.classList.contains('show');
+        closeUserDropdownOnly();
+        if (!isOpen) {
+            panel?.classList.add('show');
+            panel?.setAttribute('aria-hidden', 'false');
+            await loadNotifications();
+            await markAllNotificationsRead();
+        } else {
+            closeNotificationPanel();
+        }
+    });
+    document.getElementById('notificationClose')?.addEventListener('click', function (e) {
+        e.stopPropagation();
+        closeNotificationPanel();
+    });
+}
+
+function closeUserDropdownOnly() {
+    document.getElementById('userDropdown')?.classList.remove('show');
+}
+
+function closeNotificationPanel() {
+    const panel = document.getElementById('notificationPanel');
+    panel?.classList.remove('show');
+    panel?.setAttribute('aria-hidden', 'true');
+}
+
+function updateNotificationBadge(items) {
+    const unread = (items || []).filter(n => !n.read_at).length;
+    const dot = document.getElementById('notificationDot');
+    const count = document.getElementById('notificationCount');
+    if (dot) dot.classList.toggle('show', unread > 0);
+    if (count) {
+        count.textContent = unread > 9 ? '9+' : String(unread);
+        count.classList.toggle('show', unread > 0);
+    }
+    const sub = document.getElementById('notificationSub');
+    if (sub) sub.textContent = unread > 0 ? unread + ' thông báo chưa đọc' : 'Tối đa 5 thông báo gần nhất';
+}
+
+function renderNotifications(items) {
+    const list = document.getElementById('notificationList');
+    if (!list) return;
+    if (!items || !items.length) {
+        list.innerHTML = '<div class="notification-empty"><i class="fa-regular fa-bell-slash"></i><b>Chưa có thông báo</b><span>Mọi cập nhật quan trọng sẽ xuất hiện ở đây.</span></div>';
+        updateNotificationBadge([]);
+        return;
+    }
+    list.innerHTML = items.map(n => {
+        const p = notificationDateParts(n.created_at);
+        return `<button type="button" class="notification-item ${n.read_at ? '' : 'unread'}" data-notification-id="${notificationEscape(n.id)}">
+            <span class="notification-item-icon"><i class="fa-solid ${notificationEscape(n.icon || 'fa-bell')}"></i></span>
+            <span class="notification-item-body">
+                <strong>${notificationEscape(n.title)}</strong>
+                ${n.message ? `<span class="notification-message">${notificationEscape(n.message)}</span>` : ''}
+                <small><i class="fa-regular fa-clock"></i> ${p.time} · ${p.date}</small>
+            </span>
+            ${!n.read_at ? '<span class="notification-unread-dot"></span>' : ''}
+        </button>`;
+    }).join('');
+
+    list.querySelectorAll('.notification-item').forEach(el => {
+        el.addEventListener('click', async function () {
+            const id = this.dataset.notificationId;
+            if (!id) return;
+            await _supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id).eq('user_id', currentUser.id);
+            await loadNotifications();
+        });
+    });
+    updateNotificationBadge(items);
+}
+
+async function loadNotifications() {
+    if (!currentUser) return [];
+    ensureNotificationUI();
+    const { data, error } = await _supabase
+        .from('notifications')
+        .select('id,user_id,title,message,icon,source_key,created_at,read_at')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+    if (error) {
+        console.warn('Không tải được notifications:', error.message);
+        const sub = document.getElementById('notificationSub');
+        if (sub) sub.textContent = 'Không tải được thông báo';
+        return [];
+    }
+    notificationsLoadedOnce = true;
+    renderNotifications(data || []);
+    return data || [];
+}
+
+async function markAllNotificationsRead() {
+    if (!currentUser) return;
+    await _supabase.from('notifications')
+        .update({ read_at: new Date().toISOString() })
+        .eq('user_id', currentUser.id)
+        .is('read_at', null);
+    await loadNotifications();
+}
+
+async function createNotification(title, message = '', icon = 'fa-bell', sourceKey = null) {
+    if (!currentUser) return;
+    const payload = {
+        user_id: currentUser.id,
+        title,
+        message,
+        icon,
+        source_key: sourceKey || null,
+        // Ghi thời điểm tạo từ thiết bị theo ISO UTC. Supabase sẽ lưu đúng instant,
+        // sau đó giao diện đổi sang Asia/Ho_Chi_Minh khi hiển thị.
+        created_at: new Date().toISOString()
+    };
+    const { error } = await _supabase.from('notifications').insert(payload);
+    if (error && !String(error.message || '').toLowerCase().includes('duplicate')) {
+        console.warn('Tạo notification thất bại:', error.message);
+        return;
+    }
+    await loadNotifications();
+}
+
+function setupNotificationsRealtime() {
+    if (!currentUser) return;
+    if (notificationsRealtimeChannel) {
+        try { _supabase.removeChannel(notificationsRealtimeChannel); } catch (_) {}
+        notificationsRealtimeChannel = null;
+    }
+    notificationsRealtimeChannel = _supabase
+        .channel('weclass-notifications-' + currentUser.id)
+        .on('postgres_changes', {
+            event: '*', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + currentUser.id
+        }, function () {
+            loadNotifications();
+        })
+        .subscribe();
+}
+
+function parseScheduleStartMinutes(value) {
+    if (!value) return null;
+    const m = String(value).match(/(\d{1,2})\s*(?:h|:|g)\s*(\d{0,2})?/i);
+    if (!m) return null;
+    const hour = Number(m[1]);
+    const minute = Number(m[2] || 0);
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return hour * 60 + minute;
+}
+
+async function checkTodayScheduleNotifications() {
+    if (!currentUser) return;
+    const now = new Date();
+    const day = now.getDay() === 0 ? 7 : now.getDay() + 1; // JS CN=0 -> T2=2 ... T7=7
+    const todayKey = getTodayString();
+    const { data: items, error } = await _supabase.from('schedule').select('*').eq('user_id', currentUser.id).eq('day', day);
+    if (error || !items) return;
+
+    const todayItems = items.filter(x => x.subject || x.time_val);
+    if (todayItems.length && now.getHours() < 12) {
+        await createNotification(
+            'Hôm nay bạn có lịch dạy',
+            'Bạn có ' + todayItems.length + ' lịch trong thời khóa biểu hôm nay.',
+            'fa-calendar-day',
+            'daily-schedule-' + todayKey
+        );
+    }
+
+    for (const item of todayItems) {
+        if (item.type !== 'extra' || !item.time_val) continue;
+        const start = parseScheduleStartMinutes(item.time_val);
+        if (start === null) continue;
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        if (currentMinutes >= start - 30 && currentMinutes < start) {
+            await createNotification(
+                'Sắp đến giờ dạy',
+                (item.subject || 'Lịch dạy thêm') + ' · ' + item.time_val,
+                'fa-clock',
+                'schedule-reminder-' + todayKey + '-' + item.id
+            );
+        }
+    }
+}
+
+function startNotificationServices() {
+    if (!currentUser) return;
+    ensureNotificationUI();
+    loadNotifications();
+    setupNotificationsRealtime();
+    checkTodayScheduleNotifications();
+    if (notificationsPollTimer) clearInterval(notificationsPollTimer);
+    notificationsPollTimer = setInterval(function () {
+        if (document.visibilityState === 'visible' && currentUser) {
+            checkTodayScheduleNotifications();
+            loadNotifications();
+        }
+    }, 60000);
+}
+
+function stopNotificationServices() {
+    if (notificationsPollTimer) clearInterval(notificationsPollTimer);
+    notificationsPollTimer = null;
+    if (notificationsRealtimeChannel) {
+        try { _supabase.removeChannel(notificationsRealtimeChannel); } catch (_) {}
+        notificationsRealtimeChannel = null;
+    }
+    closeNotificationPanel();
+    document.getElementById('notificationBtn')?.remove();
+    document.querySelector('.notification-wrap')?.remove();
 }
 
 // --- DATA CLASS ---
@@ -870,7 +1145,15 @@ async function saveSchedule(type) {
     if (payload.length > 0) {
         const { error } = await _supabase.from('schedule').insert(payload);
         if (error) showToast('Lỗi khi lưu: ' + error.message, 'error');
-        else showToast('Lưu Thời Khóa Biểu thành công!', 'success');
+        else {
+            showToast('Lưu Thời Khóa Biểu thành công!', 'success');
+            await createNotification(
+                type === 'school' ? 'Đã cập nhật thời khóa biểu trường' : 'Đã cập nhật lịch dạy thêm',
+                type === 'school' ? 'Thời khóa biểu trường đã được lưu trên tài khoản của bạn.' : 'Lịch dạy thêm đã được lưu và đồng bộ qua Supabase.',
+                type === 'school' ? 'fa-school' : 'fa-chalkboard-user',
+                'schedule-saved-' + type + '-' + Date.now()
+            );
+        }
     } else {
         showToast('Đã xóa trống lịch biểu!', 'success');
     }
@@ -1296,7 +1579,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     window.onclick = (e) => {
-        document.getElementById('userDropdown')?.classList.remove('show');
+        const userDropdown = document.getElementById('userDropdown');
+        const userMenu = document.getElementById('userMenu') || document.querySelector('.user-menu');
+        const notificationWrap = document.querySelector('.notification-wrap');
+        if (userDropdown && (!userMenu || !userMenu.contains(e.target))) userDropdown.classList.remove('show');
+        if (notificationWrap && !notificationWrap.contains(e.target)) closeNotificationPanel();
         const container = document.querySelector('.dropdown-tools');
         if (container && !container.contains(e.target)) {
             closeToolsMenu();

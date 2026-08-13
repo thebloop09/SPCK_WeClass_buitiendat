@@ -2136,6 +2136,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     clickAction('btnLogout', async () => {
+        // Đăng xuất → luôn về chế độ sáng (khớp trang login/landing)
+        try {
+            document.documentElement.setAttribute('data-theme', 'light');
+            localStorage.setItem('theme', 'light');
+            if (typeof updateThemeUI === 'function') updateThemeUI('light');
+        } catch (_) {}
         await _supabase.auth.signOut();
         window.location.href = 'index.html';
     });

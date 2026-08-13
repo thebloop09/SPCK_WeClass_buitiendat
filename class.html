@@ -83,9 +83,14 @@
                 <div class="card">
                     <div style="display:flex; justify-content:space-between; align-items:center; width:100%; flex-wrap:wrap; gap:10px;">
                         <h3 style="margin:0;">Danh sách lớp</h3>
-                        <button type="button" id="btnExportStudents" class="btn-export" title="Xuất danh sách + điểm + đánh giá AI">
-                            <i class="fa-solid fa-file-excel"></i> Xuất file
-                        </button>
+                        <div class="student-list-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button type="button" id="btnPasteStudents" class="btn-paste" title="Dán danh sách học sinh (STT, tên, SĐT)">
+                                <i class="fa-solid fa-clipboard-list"></i> Dán danh sách
+                            </button>
+                            <button type="button" id="btnExportStudents" class="btn-export" title="Xuất danh sách + điểm + đánh giá AI">
+                                <i class="fa-solid fa-file-excel"></i> Xuất file
+                            </button>
+                        </div>
                     </div>
 
                     <div id="attendance-stats" class="attendance-stats">

@@ -1756,6 +1756,347 @@ select#classGrade:focus {
     transform: none !important;
 }
 
+/* Nút dán danh sách học sinh */
+.btn-paste {
+    background: linear-gradient(105deg, #6366f1, #4f46e5) !important;
+    color: white !important;
+    padding: 10px 16px !important;
+    border-radius: 14px !important;
+    font-size: 0.85rem !important;
+    font-weight: 700 !important;
+    width: auto !important;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35) !important;
+    white-space: nowrap;
+}
+.btn-paste:hover {
+    background: linear-gradient(105deg, #818cf8, #6366f1) !important;
+    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45) !important;
+}
+.btn-paste:disabled {
+    opacity: 0.7;
+    cursor: wait;
+    transform: none !important;
+}
+
+/* Vùng kéo thả / tải file danh sách HS */
+.paste-dropzone {
+    border: 1.5px dashed color-mix(in srgb, var(--primary) 45%, var(--border));
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--primary) 7%, var(--input-bg));
+    cursor: pointer;
+    transition: 0.2s ease;
+    user-select: none;
+}
+.paste-dropzone:hover,
+.paste-dropzone.dragover {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 14%, var(--input-bg));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+.paste-dropzone.has-file {
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--accent-green) 55%, var(--border));
+    background: color-mix(in srgb, var(--accent-green) 10%, var(--input-bg));
+}
+.paste-dropzone-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 18px 14px;
+    text-align: center;
+}
+.paste-dropzone-inner > i {
+    font-size: 1.6rem;
+    color: var(--primary);
+    margin-bottom: 2px;
+}
+.paste-dropzone.has-file .paste-dropzone-inner > i {
+    color: var(--accent-green);
+}
+.paste-dropzone-title {
+    font-weight: 800;
+    font-size: 0.92rem;
+    color: var(--text-main);
+}
+.paste-dropzone-sub {
+    font-size: 0.78rem;
+    color: var(--text-sub);
+    line-height: 1.4;
+}
+.paste-file-link {
+    display: inline;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: none !important;
+    box-shadow: none !important;
+    color: var(--primary) !important;
+    font-weight: 800;
+    font-size: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+    width: auto;
+    border-radius: 0;
+}
+.paste-file-link:hover {
+    color: var(--primary-hover) !important;
+    transform: none !important;
+    background: none !important;
+}
+.paste-dropzone-file {
+    margin-top: 4px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-main);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.paste-dropzone-file:empty { display: none; }
+.paste-dropzone-file i {
+    color: var(--accent-green);
+    margin-right: 4px;
+}
+
+/* Modal dán danh sách */
+.paste-modal-card {
+    position: relative;
+    background: var(--bg-card);
+    width: 92%;
+    max-width: 560px;
+    max-height: min(90vh, 720px);
+    overflow: hidden;
+    border-radius: 24px;
+    padding: 0;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.42);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    animation: popupAnim 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.paste-modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 20px 22px 14px;
+    border-bottom: 1px solid var(--border);
+}
+.paste-modal-head h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.paste-modal-head h3 i { color: var(--primary); }
+.paste-modal-head p {
+    margin: 6px 0 0;
+    font-size: 0.82rem;
+    color: var(--text-sub);
+    line-height: 1.45;
+}
+.paste-modal-body {
+    padding: 16px 22px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.paste-modal-body textarea {
+    width: 100%;
+    min-height: 180px;
+    max-height: 280px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text-main);
+    font-size: 0.9rem;
+    font-family: 'Plus Jakarta Sans', ui-monospace, monospace;
+    line-height: 1.5;
+    resize: vertical;
+    text-align: left;
+}
+.paste-modal-body textarea:focus {
+    border-color: var(--accent-cyan);
+    outline: 3px solid color-mix(in srgb, var(--accent-cyan) 14%, transparent);
+}
+.paste-hint {
+    font-size: 0.78rem;
+    color: var(--text-sub);
+    line-height: 1.5;
+    background: color-mix(in srgb, var(--accent-cyan) 8%, var(--input-bg));
+    border: 1px solid color-mix(in srgb, var(--accent-cyan) 22%, var(--border));
+    border-radius: 12px;
+    padding: 10px 12px;
+}
+.paste-hint code {
+    font-size: 0.76rem;
+    background: var(--bg-card);
+    padding: 1px 6px;
+    border-radius: 6px;
+    color: var(--primary);
+}
+.paste-preview {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--input-bg);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    max-height: 260px;
+}
+.paste-preview.show { display: flex; }
+.paste-preview-title {
+    flex-shrink: 0;
+    padding: 10px 12px 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-sub);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.paste-preview-title .paste-count {
+    color: var(--text-main);
+    font-weight: 800;
+}
+.paste-preview-warn-badge {
+    margin-left: auto;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #f59e0b;
+    background: color-mix(in srgb, #f59e0b 14%, transparent);
+    border: 1px solid color-mix(in srgb, #f59e0b 35%, var(--border));
+    border-radius: 999px;
+    padding: 2px 8px;
+}
+.paste-preview-head {
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 48px 1fr 110px;
+    gap: 8px;
+    padding: 7px 12px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-sub);
+    background: color-mix(in srgb, var(--bg-card) 70%, var(--input-bg));
+    border-bottom: 1px solid var(--border);
+}
+.paste-preview-scroll {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 190px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+.paste-preview-scroll::-webkit-scrollbar {
+    width: 8px;
+}
+.paste-preview-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.paste-preview-scroll::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+.paste-preview-scroll::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--scrollbar-thumb) 80%, var(--text-main));
+    background-clip: padding-box;
+}
+.paste-preview-row {
+    display: grid;
+    grid-template-columns: 48px 1fr 110px;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 0.84rem;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+}
+.paste-preview-row:last-child { border-bottom: 0; }
+.paste-preview-row .stt { font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
+.paste-preview-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.paste-preview-row .phone { color: var(--text-sub); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.paste-preview-row.warn {
+    background: color-mix(in srgb, #f59e0b 10%, transparent);
+}
+.paste-preview-row.warn .name::after {
+    content: attr(data-warn);
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #f59e0b;
+    white-space: normal;
+    margin-top: 2px;
+}
+.paste-preview-foot {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 0.75rem;
+    color: var(--text-sub);
+    border-top: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg-card) 55%, var(--input-bg));
+}
+.paste-preview-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--text-sub);
+    font-size: 0.85rem;
+}
+.paste-modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 22px 20px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+.paste-modal-foot button {
+    width: auto;
+    padding: 11px 18px;
+    font-size: 0.88rem;
+}
+.btn-paste-cancel {
+    background: var(--input-bg) !important;
+    color: var(--text-main) !important;
+    box-shadow: none !important;
+    border: 1px solid var(--border) !important;
+}
+.btn-paste-cancel:hover {
+    background: var(--bg-body) !important;
+    transform: none !important;
+}
+@media (max-width: 520px) {
+    .paste-preview-head,
+    .paste-preview-row {
+        grid-template-columns: 40px 1fr;
+    }
+    .paste-preview-head span:last-child,
+    .paste-preview-row .phone {
+        display: none;
+    }
+    .paste-preview-row.warn .name::after {
+        white-space: normal;
+    }
+    .student-list-actions {
+        width: 100%;
+    }
+    .student-list-actions button {
+        flex: 1;
+    }
+}
+
 /* ========== SETTINGS PAGE ========== */
 .settings-layout {
     display: flex;
@@ -2672,6 +3013,7 @@ button.warning, .btn-settings.warning { background: linear-gradient(105deg, #f59
 .btn-vao-hoc, .btn-add, .btn-save-gb, .btn-settings.primary { background: linear-gradient(105deg, var(--primary), #ff713d) !important; }
 .btn-hocba { background: linear-gradient(105deg, #17b8ed, #087fe5) !important; border-radius: 11px !important; }
 .btn-export { background: linear-gradient(105deg, #25d59f, #10a987) !important; border-radius: 11px !important; }
+.btn-paste { background: linear-gradient(105deg, #6366f1, #4f46e5) !important; border-radius: 11px !important; }
 
 .class-header-layout { gap: 22px; margin: 18px auto 1.6rem; max-width: 1180px; }
 .class-header-card { background: linear-gradient(135deg, color-mix(in srgb, var(--bg-card) 96%, #233a70), var(--bg-card)); }

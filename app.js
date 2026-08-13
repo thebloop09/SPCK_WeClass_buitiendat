@@ -651,6 +651,523 @@ window.deleteStudentEvent = async (event, id) => {
     }
 };
 
+// ============================================================
+// DÁN DANH SÁCH HỌC SINH (STT · Tên · SĐT)
+// ============================================================
+function normalizePhone(raw) {
+    if (!raw) return null;
+    let p = String(raw).trim().replace(/[.\-\s]/g, '');
+    if (/^\+84\d{8,10}$/.test(p)) p = '0' + p.slice(3);
+    if (/^84\d{8,10}$/.test(p)) p = '0' + p.slice(2);
+    if (!/^(0\d{8,10}|0\d{9})$/.test(p) && !/^\d{9,11}$/.test(p)) {
+        if (!/^\d{8,12}$/.test(p)) return null;
+    }
+    return p || null;
+}
+
+function looksLikePhone(token) {
+    if (!token) return false;
+    const cleaned = String(token).trim().replace(/[.\-\s]/g, '');
+    return /^(0|\+84|84)?\d{8,11}$/.test(cleaned) && cleaned.replace(/\D/g, '').length >= 9;
+}
+
+function looksLikeStt(token) {
+    if (!token) return false;
+    const t = String(token).trim().replace(/[.)]/g, '');
+    return /^\d{1,3}$/.test(t);
+}
+
+function isHeaderLine(line) {
+    const low = line.toLowerCase().replace(/\s+/g, ' ');
+    return /^(stt|số|so tt|so thu tu|tt)\b/.test(low)
+        || /\b(họ\s*tên|ho ten|tên|ten hs|họ và tên)\b/.test(low)
+        || (low.includes('stt') && low.includes('tên'));
+}
+
+/**
+ * Parse một dòng danh sách học sinh.
+ * Hỗ trợ: tab / ; / | / ,  hoặc khoảng trắng;
+ * dạng "1. Nguyễn Văn A 0912..." / "1 Nguyễn Văn A" / Excel paste.
+ */
+function parseStudentLine(line, fallbackStt) {
+    const raw = String(line || '').trim();
+    if (!raw) return null;
+    if (isHeaderLine(raw)) return null;
+
+    let parts = raw.split(/\t+|[|;]+/).map(p => p.trim()).filter(Boolean);
+
+    if (parts.length === 1) {
+        const commaParts = raw.split(/\s*,\s*/).map(p => p.trim()).filter(Boolean);
+        if (commaParts.length >= 2 && commaParts.length <= 4) {
+            parts = commaParts;
+        }
+    }
+
+    let stt = null;
+    let name = null;
+    let phone = null;
+
+    if (parts.length >= 2) {
+        const first = parts[0];
+        const last = parts[parts.length - 1];
+
+        if (looksLikeStt(first)) {
+            stt = parseInt(String(first).replace(/[.)]/g, ''), 10);
+            if (parts.length >= 3 && looksLikePhone(last)) {
+                phone = normalizePhone(last);
+                name = parts.slice(1, -1).join(' ').trim();
+            } else {
+                name = parts.slice(1).join(' ').trim();
+                const m = name.match(/^(.*?)[\s,]+((?:0|\+84|84)?[\d.\-\s]{8,14})$/);
+                if (m && looksLikePhone(m[2])) {
+                    name = m[1].trim();
+                    phone = normalizePhone(m[2]);
+                }
+            }
+        } else if (looksLikePhone(last) && parts.length >= 2) {
+            phone = normalizePhone(last);
+            name = parts.slice(0, -1).join(' ').trim();
+        } else {
+            name = parts.join(' ').trim();
+        }
+    } else {
+        let rest = raw;
+
+        const sttMatch = rest.match(/^(\d{1,3})[.)\-\s]+(.+)$/);
+        if (sttMatch) {
+            stt = parseInt(sttMatch[1], 10);
+            rest = sttMatch[2].trim();
+        }
+
+        const phoneMatch = rest.match(/^(.*?)[\s,]+((?:0|\+84|84)?[\d.\-\s]{8,14})\s*$/);
+        if (phoneMatch && looksLikePhone(phoneMatch[2])) {
+            name = phoneMatch[1].trim();
+            phone = normalizePhone(phoneMatch[2]);
+        } else {
+            name = rest.trim();
+        }
+    }
+
+    if (!name || name.length < 2) return null;
+    if (/^\d+$/.test(name)) return null;
+
+    name = name.replace(/\s+/g, ' ').replace(/^[-–—.\s]+|[-–—.\s]+$/g, '').trim();
+    if (!name) return null;
+
+    if (stt === null || Number.isNaN(stt)) {
+        stt = fallbackStt;
+    }
+
+    return {
+        student_number: stt,
+        name,
+        phone: phone || null
+    };
+}
+
+function parseStudentPasteText(text) {
+    const lines = String(text || '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .split('\n');
+
+    const results = [];
+    let autoStt = 1;
+    const usedStt = new Set();
+
+    lines.forEach(line => {
+        const parsed = parseStudentLine(line, autoStt);
+        if (!parsed) return;
+
+        let stt = parsed.student_number;
+        if (usedStt.has(stt)) {
+            while (usedStt.has(autoStt)) autoStt++;
+            stt = autoStt;
+        }
+        usedStt.add(stt);
+        autoStt = Math.max(autoStt, stt + 1);
+
+        results.push({
+            student_number: stt,
+            name: parsed.name,
+            phone: parsed.phone
+        });
+    });
+
+    return results;
+}
+
+function pasteStudentWarn(s) {
+    const name = String(s.name || '').trim();
+    const stt = s.student_number;
+    const reasons = [];
+    if (name.length < 3) reasons.push('Tên quá ngắn');
+    if (name.split(/\s+/).length < 2) reasons.push('Thiếu họ/tên đệm?');
+    if (/^\d+$/.test(name)) reasons.push('Tên chỉ toàn số');
+    if (looksLikePhone(name)) reasons.push('Tên giống SĐT');
+    if (stt === null || stt === undefined || Number.isNaN(Number(stt))) reasons.push('STT lỗi');
+    if (Number(stt) < 1 || Number(stt) > 80) reasons.push('STT bất thường');
+    if (s.phone && !/^0\d{8,10}$/.test(String(s.phone))) reasons.push('SĐT lạ');
+    return reasons;
+}
+
+function renderPastePreview(students) {
+    const box = document.getElementById('pastePreview');
+    if (!box) return;
+    if (!students.length) {
+        box.classList.remove('show');
+        box.innerHTML = '';
+        return;
+    }
+
+    // Cảnh báo STT trùng trong danh sách dán
+    const sttCount = {};
+    const nameCount = {};
+    students.forEach(function (s) {
+        const k = String(s.student_number);
+        sttCount[k] = (sttCount[k] || 0) + 1;
+        const nk = String(s.name || '').trim().toLowerCase();
+        if (nk) nameCount[nk] = (nameCount[nk] || 0) + 1;
+    });
+
+    let warnTotal = 0;
+    const rowsHtml = students.map(function (s) {
+        const reasons = pasteStudentWarn(s);
+        if ((sttCount[String(s.student_number)] || 0) > 1) reasons.push('Trùng STT trong file');
+        const nk = String(s.name || '').trim().toLowerCase();
+        if (nk && (nameCount[nk] || 0) > 1) reasons.push('Trùng tên trong file');
+        const isWarn = reasons.length > 0;
+        if (isWarn) warnTotal++;
+        const warnAttr = isWarn
+            ? ' data-warn="' + reasons.join(' · ').replace(/"/g, '&quot;') + '"'
+            : '';
+        return (
+            '<div class="paste-preview-row' + (isWarn ? ' warn' : '') + '">' +
+            '<span class="stt">#' + s.student_number + '</span>' +
+            '<span class="name"' + warnAttr + '>' + String(s.name).replace(/</g, '&lt;') + '</span>' +
+            '<span class="phone">' + (s.phone ? String(s.phone).replace(/</g, '&lt;') : '—') + '</span>' +
+            '</div>'
+        );
+    }).join('');
+
+    box.classList.add('show');
+    box.innerHTML =
+        '<div class="paste-preview-title">' +
+        '<i class="fa-solid fa-eye"></i> Xem trước · <span class="paste-count">' + students.length + ' học sinh</span>' +
+        (warnTotal
+            ? '<span class="paste-preview-warn-badge"><i class="fa-solid fa-triangle-exclamation"></i> ' + warnTotal + ' dòng cần kiểm tra</span>'
+            : '') +
+        '</div>' +
+        '<div class="paste-preview-head"><span>STT</span><span>Họ và tên</span><span>SĐT</span></div>' +
+        '<div class="paste-preview-scroll" id="pastePreviewScroll">' + rowsHtml + '</div>' +
+        '<div class="paste-preview-foot">' +
+        (students.length > 6
+            ? '<i class="fa-solid fa-arrows-up-down"></i> Kéo thanh cuộn để xem hết danh sách · '
+            : '') +
+        'Kiểm tra STT / tên trước khi thêm' +
+        (warnTotal ? ' · dòng vàng = có thể sai' : '') +
+        '</div>';
+}
+
+window.closePasteStudentsModal = function () {
+    document.getElementById('pasteStudentsOverlay')?.remove();
+};
+
+/** Đọc file .txt / .csv / .xlsx / .xls thành text (mỗi dòng 1 HS) */
+async function readStudentListFile(file) {
+    if (!file) throw new Error('Không có file');
+    const name = (file.name || '').toLowerCase();
+    const isExcel = /\.xlsx?$|\.xls$/.test(name)
+        || /sheet|excel|spreadsheetml/i.test(file.type || '');
+
+    if (isExcel) {
+        if (typeof XLSX === 'undefined') {
+            throw new Error('Thư viện Excel chưa tải. Hãy dùng file .txt hoặc .csv, hoặc tải lại trang.');
+        }
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array', cellDates: false, raw: false });
+        const sheetName = wb.SheetNames[0];
+        if (!sheetName) throw new Error('File Excel trống');
+        const sheet = wb.Sheets[sheetName];
+        // Ưu tiên TSV để parser nhận tab
+        const tsv = XLSX.utils.sheet_to_csv(sheet, { FS: '\t', RS: '\n', blankrows: false });
+        return tsv;
+    }
+
+    // txt / csv / các file text khác
+    const text = await file.text();
+    return text;
+}
+
+window.openPasteStudentsModal = function () {
+    if (!currentClassId) {
+        showToast('Hãy vào một lớp trước khi dán danh sách.', 'error');
+        return;
+    }
+
+    document.getElementById('pasteStudentsOverlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'pasteStudentsOverlay';
+    overlay.className = 'modal-overlay';
+    overlay.onclick = function (e) {
+        if (e.target === overlay) window.closePasteStudentsModal();
+    };
+
+    overlay.innerHTML =
+        '<div class="paste-modal-card" role="dialog" aria-modal="true" aria-labelledby="pasteModalTitle">' +
+        '<div class="paste-modal-head">' +
+        '<div>' +
+        '<h3 id="pasteModalTitle"><i class="fa-solid fa-clipboard-list"></i> Thêm danh sách học sinh</h3>' +
+        '<p>Dán text, kéo thả file hoặc tải lên. Tự nhận <b>STT</b>, <b>họ tên</b>, <b>SĐT</b>.</p>' +
+        '</div>' +
+        '<button type="button" class="notification-close" id="btnClosePasteModal" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button>' +
+        '</div>' +
+        '<div class="paste-modal-body">' +
+        '<div class="paste-dropzone" id="pasteDropzone">' +
+        '<input type="file" id="pasteFileInput" accept=".txt,.csv,.xlsx,.xls,text/plain,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>' +
+        '<div class="paste-dropzone-inner">' +
+        '<i class="fa-solid fa-cloud-arrow-up"></i>' +
+        '<div class="paste-dropzone-title">Kéo thả file vào đây</div>' +
+        '<div class="paste-dropzone-sub">hoặc <button type="button" class="paste-file-link" id="btnPickPasteFile">chọn file</button> · hỗ trợ .txt .csv .xlsx</div>' +
+        '<div class="paste-dropzone-file" id="pasteFileName"></div>' +
+        '</div>' +
+        '</div>' +
+        '<div class="paste-hint">' +
+        'Hoặc dán / gõ mỗi dòng một học sinh:<br>' +
+        '<code>1 Nguyễn Văn An 0912345678</code> · ' +
+        '<code>2. Trần Thị Bình</code> · ' +
+        'Excel: cột STT | Tên | SĐT' +
+        '</div>' +
+        '<textarea id="pasteStudentsText" placeholder="Dán danh sách vào đây..." spellcheck="false"></textarea>' +
+        '<div id="pastePreview" class="paste-preview"></div>' +
+        '</div>' +
+        '<div class="paste-modal-foot">' +
+        '<button type="button" class="btn-paste-cancel" id="btnCancelPaste">Hủy</button>' +
+        '<button type="button" id="btnConfirmPaste" disabled><i class="fa-solid fa-user-plus"></i> Thêm vào lớp</button>' +
+        '</div>' +
+        '</div>';
+
+    document.body.appendChild(overlay);
+
+    const ta = document.getElementById('pasteStudentsText');
+    const btnOk = document.getElementById('btnConfirmPaste');
+    const dropzone = document.getElementById('pasteDropzone');
+    const fileInput = document.getElementById('pasteFileInput');
+    const fileNameEl = document.getElementById('pasteFileName');
+    let lastParsed = [];
+
+    function refreshPreview() {
+        lastParsed = parseStudentPasteText(ta.value);
+        renderPastePreview(lastParsed);
+        btnOk.disabled = lastParsed.length === 0;
+        btnOk.innerHTML = lastParsed.length
+            ? '<i class="fa-solid fa-user-plus"></i> Thêm ' + lastParsed.length + ' học sinh'
+            : '<i class="fa-solid fa-user-plus"></i> Thêm vào lớp';
+    }
+
+    async function applyFile(file) {
+        if (!file) return;
+        const maxMb = 5;
+        if (file.size > maxMb * 1024 * 1024) {
+            showToast('File quá lớn (tối đa ' + maxMb + ' MB).', 'error');
+            return;
+        }
+        if (fileNameEl) {
+            fileNameEl.innerHTML = '<i class="fa-solid fa-file"></i> ' +
+                String(file.name).replace(/</g, '&lt;') +
+                ' <span style="opacity:.7">(' + Math.max(1, Math.round(file.size / 1024)) + ' KB)</span>';
+        }
+        dropzone?.classList.add('has-file');
+        btnOk.disabled = true;
+        btnOk.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đọc file...';
+        try {
+            const text = await readStudentListFile(file);
+            ta.value = text;
+            refreshPreview();
+            if (!lastParsed.length) {
+                showToast('Không đọc được học sinh từ file. Kiểm tra cột STT / Tên.', 'error');
+            } else {
+                showToast('Đã đọc ' + lastParsed.length + ' học sinh từ file.', 'success');
+            }
+        } catch (e) {
+            console.error(e);
+            showToast('Lỗi đọc file: ' + (e.message || e), 'error');
+            refreshPreview();
+        }
+    }
+
+    ta.addEventListener('input', refreshPreview);
+    ta.addEventListener('paste', function () { setTimeout(refreshPreview, 0); });
+
+    document.getElementById('btnPickPasteFile')?.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        fileInput?.click();
+    });
+    dropzone?.addEventListener('click', function (e) {
+        if (e.target.closest('.paste-file-link')) return;
+        fileInput?.click();
+    });
+    fileInput?.addEventListener('change', function () {
+        const f = fileInput.files && fileInput.files[0];
+        if (f) applyFile(f);
+        fileInput.value = '';
+    });
+
+    ['dragenter', 'dragover'].forEach(function (ev) {
+        dropzone?.addEventListener(ev, function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.add('dragover');
+        });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+        dropzone?.addEventListener(ev, function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('dragover');
+        });
+    });
+    dropzone?.addEventListener('drop', function (e) {
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) applyFile(f);
+    });
+
+    // Cho phép kéo file vào cả textarea
+    ta.addEventListener('dragover', function (e) { e.preventDefault(); });
+    ta.addEventListener('drop', function (e) {
+        e.preventDefault();
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) applyFile(f);
+    });
+
+    document.getElementById('btnClosePasteModal')?.addEventListener('click', function () {
+        window.closePasteStudentsModal();
+    });
+    document.getElementById('btnCancelPaste')?.addEventListener('click', function () {
+        window.closePasteStudentsModal();
+    });
+
+    btnOk.addEventListener('click', async function () {
+        if (!lastParsed.length || !currentClassId) return;
+        btnOk.disabled = true;
+        btnOk.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang thêm...';
+
+        try {
+            const result = await bulkInsertStudents(lastParsed);
+            window.closePasteStudentsModal();
+            await loadStudents();
+            if (result.added > 0) {
+                showToast('Đã thêm ' + result.added + ' học sinh' +
+                    (result.skipped ? (' · bỏ qua ' + result.skipped + ' dòng trùng STT/tên') : ''), 'success');
+            } else if (result.skipped) {
+                showToast('Không thêm mới — ' + result.skipped + ' dòng trùng với danh sách hiện có.', 'info');
+            } else {
+                showToast('Không có học sinh nào được thêm.', 'info');
+            }
+        } catch (e) {
+            console.error(e);
+            showToast('Lỗi khi thêm: ' + (e.message || e), 'error');
+            btnOk.disabled = false;
+            btnOk.innerHTML = '<i class="fa-solid fa-user-plus"></i> Thêm ' + lastParsed.length + ' học sinh';
+        }
+    });
+
+    setTimeout(function () { ta.focus(); }, 50);
+};
+
+async function bulkInsertStudents(parsedList) {
+    if (!currentClassId || !parsedList.length) return { added: 0, skipped: 0 };
+
+    const today = getTodayString();
+    const existing = currentStudents || [];
+    const existingStt = new Set(existing.map(s => String(s.student_number)));
+    const existingNames = new Set(existing.map(s => String(s.name || '').trim().toLowerCase()));
+
+    const toInsert = [];
+    let skipped = 0;
+
+    parsedList.forEach(p => {
+        const nameKey = String(p.name || '').trim().toLowerCase();
+        const sttKey = String(p.student_number);
+        if (existingStt.has(sttKey) || existingNames.has(nameKey)) {
+            skipped++;
+            return;
+        }
+        existingStt.add(sttKey);
+        existingNames.add(nameKey);
+        toInsert.push({
+            name: p.name,
+            student_number: p.student_number,
+            class_id: currentClassId,
+            points: 0,
+            is_present: false,
+            attendance_date: today,
+            phone: p.phone || null
+        });
+    });
+
+    if (!toInsert.length) return { added: 0, skipped };
+
+    const chunkSize = 50;
+    let added = 0;
+    const newIds = [];
+
+    for (let i = 0; i < toInsert.length; i += chunkSize) {
+        const chunk = toInsert.slice(i, i + chunkSize);
+        let res = await _supabase.from('students').insert(chunk).select('id');
+
+        if (res.error && (res.error.message || '').includes('points')) {
+            const withoutPoints = chunk.map(function (row) {
+                const r = Object.assign({}, row);
+                delete r.points;
+                return r;
+            });
+            res = await _supabase.from('students').insert(withoutPoints).select('id');
+        }
+
+        if (res.error && /phone/i.test(res.error.message || '')) {
+            const withoutPhone = chunk.map(function (row) {
+                const r = Object.assign({}, row);
+                delete r.phone;
+                return r;
+            });
+            res = await _supabase.from('students').insert(withoutPhone).select('id');
+        }
+
+        if (res.error) {
+            throw new Error(res.error.message || 'Không chèn được học sinh');
+        }
+
+        const ids = (res.data || []).map(function (r) { return r.id; });
+        newIds.push.apply(newIds, ids);
+        added += ids.length;
+    }
+
+    if (newIds.length) {
+        try {
+            const logs = newIds.map(function (id) {
+                return {
+                    student_id: id,
+                    attendance_date: today,
+                    is_present: false
+                };
+            });
+            for (let i = 0; i < logs.length; i += chunkSize) {
+                await _supabase.from('attendance_logs').upsert(
+                    logs.slice(i, i + chunkSize),
+                    { onConflict: 'student_id,attendance_date' }
+                );
+            }
+        } catch (e) {
+            console.warn('attendance_logs bulk:', e);
+        }
+    }
+
+    return { added, skipped };
+}
+
 // --- MODAL CỘNG TRỪ ĐIỂM ---
 window.openPointModal = (studentId) => {
     const student = currentStudents.find(s => String(s.id) === String(studentId));
@@ -1750,6 +2267,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     clickAction('btnSaveSchool', () => saveSchedule('school'));
     clickAction('btnExportStudents', () => exportStudentList());
+    clickAction('btnPasteStudents', () => openPasteStudentsModal());
     clickAction('btnSaveExtra', () => saveSchedule('extra'));
 });
 // --- KHỞI TẠO BIẾN TOÀN CỤC ---

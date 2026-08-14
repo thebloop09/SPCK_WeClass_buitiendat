@@ -84,7 +84,27 @@ function updateThemeUI(theme) {
     }
 }
 
+/** Áp dụng theme theo trạng thái đăng nhập.
+ *  - Chưa đăng nhập: luôn sáng (không ghi đè preference đã lưu).
+ *  - Đã đăng nhập: dùng theme người dùng đã chọn trong localStorage.
+ */
+function applyThemeForAuth(isLoggedIn) {
+    if (!isLoggedIn) {
+        document.documentElement.setAttribute('data-theme', 'light');
+        if (typeof updateThemeUI === 'function') updateThemeUI('light');
+        return;
+    }
+    const saved = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', saved);
+    if (typeof updateThemeUI === 'function') updateThemeUI(saved);
+}
+
 window.toggleTheme = function () {
+    // Chỉ cho đổi theme khi đã đăng nhập; khi chưa login luôn giữ sáng
+    if (!currentUser) {
+        applyThemeForAuth(false);
+        return;
+    }
     const theme = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
@@ -99,6 +119,9 @@ function applyUserSession(user) {
     const userMenu = document.getElementById('userMenu');
     const userEmailDisplay = document.getElementById('userEmailDisplay');
     const btnAvatar = document.getElementById('avatarBtn');
+
+    // Theme theo trạng thái đăng nhập
+    applyThemeForAuth(!!user);
 
     if (user) {
         if (authButtons) authButtons.style.display = 'none';
@@ -379,10 +402,12 @@ function startNotificationServices() {
     loadNotifications();
     setupNotificationsRealtime();
     checkTodayScheduleNotifications();
+    if (typeof checkNoteReminders === 'function') checkNoteReminders();
     if (notificationsPollTimer) clearInterval(notificationsPollTimer);
     notificationsPollTimer = setInterval(function () {
         if (document.visibilityState === 'visible' && currentUser) {
             checkTodayScheduleNotifications();
+            if (typeof checkNoteReminders === 'function') checkNoteReminders();
             loadNotifications();
         }
     }, 60000);
@@ -458,7 +483,7 @@ window.showClasses = () => {
 };
 
 window.deleteClass = async (id) => {
-    if (confirm('Xóa lớp? Toàn bộ học sinh và học bạ sẽ bị xóa theo.')) {
+    if (await showConfirmModal('Xóa lớp? Toàn bộ học sinh và học bạ sẽ bị xóa theo.')) {
         await _supabase.from('classes').delete().eq('id', id);
         loadClasses();
     }
@@ -487,8 +512,8 @@ async function loadStudents() {
     currentStudents.forEach(s => {
         let isPresent = !!s.is_present;
         if (s.attendance_date !== today) {
-            isPresent = false;
-            s.is_present = false;
+            isPresent = true;
+            s.is_present = true;
             s.attendance_date = today;
             studentUpdates.push(s.id);
         }
@@ -503,7 +528,7 @@ async function loadStudents() {
     if (studentUpdates.length > 0) {
         try {
             await _supabase.from('students')
-                .update({ is_present: false, attendance_date: today })
+                .update({ is_present: true, attendance_date: today })
                 .in('id', studentUpdates);
         } catch (e) { console.warn('reset attendance_date:', e); }
     }
@@ -613,6 +638,17 @@ window.toggleAttendance = async (studentId, isChecked) => {
         student.attendance_date = today;
     }
 
+    if (!isChecked && student) {
+        const stt = student.student_number ? ('#' + student.student_number + ' ') : '';
+        const classLabel = currentClassName ? (' · ' + currentClassName) : '';
+        await createNotification(
+            'Học sinh vắng mặt',
+            stt + (student.name || 'Học sinh') + classLabel,
+            'fa-user-xmark',
+            'absent-' + today + '-' + studentId
+        );
+    }
+
     const checkAllBox = document.getElementById('checkAllAttendance');
     if (checkAllBox) {
         checkAllBox.checked = currentStudents.every(s => s.is_present);
@@ -624,6 +660,20 @@ window.toggleAttendance = async (studentId, isChecked) => {
 window.toggleCheckAll = async (isChecked) => {
     if (!currentStudents.length) return;
     const today = getTodayString();
+
+    if (!isChecked) {
+        const classLabel = currentClassName ? (' · ' + currentClassName) : '';
+        const previouslyPresent = currentStudents.filter(s => !!s.is_present);
+        for (const student of previouslyPresent) {
+            const stt = student.student_number ? ('#' + student.student_number + ' ') : '';
+            await createNotification(
+                'Học sinh vắng mặt',
+                stt + (student.name || 'Học sinh') + classLabel,
+                'fa-user-xmark',
+                'absent-' + today + '-' + student.id
+            );
+        }
+    }
 
     const ids = currentStudents.map(s => s.id);
     await _supabase.from('students').update({
@@ -645,7 +695,7 @@ window.toggleCheckAll = async (isChecked) => {
 
 window.deleteStudentEvent = async (event, id) => {
     event.stopPropagation();
-    if (confirm('Xóa học sinh này? Học bạ và điểm danh liên quan cũng sẽ bị xóa.')) {
+    if (await showConfirmModal('Xóa học sinh này? Học bạ và điểm danh liên quan cũng sẽ bị xóa.')) {
         await _supabase.from('students').delete().eq('id', id);
         loadStudents();
     }
@@ -1102,7 +1152,7 @@ async function bulkInsertStudents(parsedList) {
             student_number: p.student_number,
             class_id: currentClassId,
             points: 0,
-            is_present: false,
+            is_present: true,
             attendance_date: today,
             phone: p.phone || null
         });
@@ -1151,7 +1201,7 @@ async function bulkInsertStudents(parsedList) {
                 return {
                     student_id: id,
                     attendance_date: today,
-                    is_present: false
+                    is_present: true
                 };
             });
             for (let i = 0; i < logs.length; i += chunkSize) {
@@ -1828,6 +1878,354 @@ window.closeToolModal = function (e) {
     }
 };
 
+// ============================================================
+// MÁY TÍNH
+// ============================================================
+let calcExpression = '0';
+let calcJustEvaluated = false;
+
+window.openCalculatorModal = function () {
+    closeToolsMenu();
+    document.getElementById('toolModalOverlay')?.remove();
+    calcExpression = '0';
+    calcJustEvaluated = false;
+    const modalHTML = `
+        <div id="toolModalOverlay" class="modal-overlay" onclick="closeToolModal(event)">
+            <div class="tool-modal-card calc-modal-card" onclick="event.stopPropagation()">
+                <button class="close-modal-btn" onclick="closeToolModal()"><i class="fa-solid fa-xmark"></i></button>
+                <h2><i class="fa-solid fa-calculator"></i> Máy tính</h2>
+                <div class="calc-display" id="calcDisplay">0</div>
+                <div class="calc-grid">
+                    <button type="button" class="calc-btn calc-fn" onclick="calcClear()">C</button>
+                    <button type="button" class="calc-btn calc-fn" onclick="calcBackspace()"><i class="fa-solid fa-delete-left"></i></button>
+                    <button type="button" class="calc-btn calc-op" onclick="calcInput('%')">%</button>
+                    <button type="button" class="calc-btn calc-op" onclick="calcInput('÷')">÷</button>
+                    <button type="button" class="calc-btn" onclick="calcInput('7')">7</button>
+                    <button type="button" class="calc-btn" onclick="calcInput('8')">8</button>
+                    <button type="button" class="calc-btn" onclick="calcInput('9')">9</button>
+                    <button type="button" class="calc-btn calc-op" onclick="calcInput('×')">×</button>
+                    <button type="button" class="calc-btn" onclick="calcInput('4')">4</button>
+                    <button type="button" class="calc-btn" onclick="calcInput('5')">5</button>
+                    <button type="button" class="calc-btn" onclick="calcInput('6')">6</button>
+                    <button type="button" class="calc-btn calc-op" onclick="calcInput('−')">−</button>
+                    <button type="button" class="calc-btn" onclick="calcInput('1')">1</button>
+                    <button type="button" class="calc-btn" onclick="calcInput('2')">2</button>
+                    <button type="button" class="calc-btn" onclick="calcInput('3')">3</button>
+                    <button type="button" class="calc-btn calc-op" onclick="calcInput('+')">+</button>
+                    <button type="button" class="calc-btn calc-zero" onclick="calcInput('0')">0</button>
+                    <button type="button" class="calc-btn" onclick="calcInput('.')">.</button>
+                    <button type="button" class="calc-btn calc-eq" onclick="calcEquals()">=</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+function calcUpdateDisplay() {
+    const el = document.getElementById('calcDisplay');
+    if (!el) return;
+    const text = calcExpression || '0';
+    el.textContent = text;
+    el.classList.toggle('calc-long', text.length > 12);
+}
+window.calcClear = function () { calcExpression = '0'; calcJustEvaluated = false; calcUpdateDisplay(); };
+window.calcBackspace = function () {
+    if (calcJustEvaluated) { calcExpression = '0'; calcJustEvaluated = false; }
+    else if (calcExpression.length <= 1) calcExpression = '0';
+    else calcExpression = calcExpression.slice(0, -1);
+    calcUpdateDisplay();
+};
+window.calcInput = function (ch) {
+    const ops = ['+', '−', '×', '÷', '%'];
+    if (calcJustEvaluated) {
+        if (ops.includes(ch)) calcJustEvaluated = false;
+        else { calcExpression = '0'; calcJustEvaluated = false; }
+    }
+    if (ops.includes(ch)) {
+        const last = calcExpression.slice(-1);
+        calcExpression = ops.includes(last) ? calcExpression.slice(0, -1) + ch : calcExpression + ch;
+    } else if (ch === '.') {
+        const parts = calcExpression.split(/[+\−×÷%]/);
+        const lastNum = parts[parts.length - 1] || '';
+        if (lastNum.includes('.')) return;
+        calcExpression += (!lastNum || ops.includes(calcExpression.slice(-1))) ? (ops.includes(calcExpression.slice(-1)) ? '0.' : '.') : '.';
+    } else {
+        calcExpression = calcExpression === '0' ? ch : (calcExpression + ch);
+    }
+    calcUpdateDisplay();
+};
+window.calcEquals = function () {
+    try {
+        let expr = calcExpression.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-').replace(/%/g, '/100');
+        if (!/^[\d+\-*/.() ]+$/.test(expr)) return showToast('Phép tính không hợp lệ', 'error');
+        const result = Function('"use strict"; return (' + expr + ')')();
+        if (typeof result !== 'number' || !isFinite(result)) return showToast('Không thể tính', 'error');
+        calcExpression = String(Math.round(result * 1e10) / 1e10);
+        calcJustEvaluated = true;
+        calcUpdateDisplay();
+    } catch (_) { showToast('Phép tính không hợp lệ', 'error'); }
+};
+
+// ============================================================
+// GHI CHÚ + NHẮC NHỞ (tối đa 10 tờ, ~500 từ/tờ)
+// ============================================================
+const NOTES_MAX = 10;
+const NOTES_MAX_WORDS = 500;
+let _notesCache = [];
+let _notesEditingId = null;
+
+function countWords(text) {
+    return String(text || '').trim().split(/\s+/).filter(Boolean).length;
+}
+
+function parseNoteReminder(content) {
+    const text = String(content || '');
+    const activityRe = /(kiểm\s*tra|kt\s*15|kt\s*1\s*tiết|thi\s|họp|sinh\s*hoạt|dạy\s*thêm|ôn\s*tập|thi\s*giữa|thi\s*cuối|bài\s*kiểm|làm\s*bài|nộp\s*bài|deadline|hạn\s*nộp)/i;
+    if (!activityRe.test(text)) return null;
+    const dateRe = /(?:ngày\s*)?(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i;
+    const dm = text.match(dateRe);
+    if (!dm) return null;
+    let day = parseInt(dm[1], 10);
+    let month = parseInt(dm[2], 10) - 1;
+    let year = dm[3] ? parseInt(dm[3], 10) : new Date().getFullYear();
+    if (year < 100) year += 2000;
+    if (day < 1 || day > 31 || month < 0 || month > 11) return null;
+    let hour = 7, minute = 30;
+    const tm = text.match(/(?:lúc\s*|vào\s*|giờ\s*)?(\d{1,2})\s*(?:h|:|g)\s*(\d{0,2})?/i);
+    if (tm) {
+        hour = parseInt(tm[1], 10);
+        minute = tm[2] ? parseInt(tm[2], 10) : 0;
+        if (hour > 23 || minute > 59) { hour = 7; minute = 30; }
+    }
+    const utc = Date.UTC(year, month, day, hour - 7, minute, 0);
+    const at = new Date(utc);
+    if (Number.isNaN(at.getTime())) return null;
+    return at.toISOString();
+}
+
+function formatReminderLabel(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const tz = 'Asia/Ho_Chi_Minh';
+    const date = new Intl.DateTimeFormat('vi-VN', { timeZone: tz, day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+    const time = new Intl.DateTimeFormat('vi-VN', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+    return date + ' · ' + time;
+}
+
+async function fetchNotes() {
+    if (!currentUser) return [];
+    const { data, error } = await _supabase
+        .from('notes')
+        .select('id,user_id,title,content,reminder_at,notified_30,notified_15,created_at,updated_at')
+        .eq('user_id', currentUser.id)
+        .order('updated_at', { ascending: false })
+        .limit(NOTES_MAX);
+    if (error) {
+        console.warn('notes:', error.message);
+        showToast('Không tải được ghi chú. Kiểm tra bảng notes trên Supabase.', 'error');
+        return [];
+    }
+    _notesCache = data || [];
+    return _notesCache;
+}
+
+function renderNotesListHtml(notes) {
+    if (!notes.length) {
+        return '<div class="note-empty"><i class="fa-regular fa-note-sticky"></i><b>Chưa có ghi chú</b><span>Tối đa 10 tờ · ~500 từ mỗi tờ</span></div>';
+    }
+    return notes.map(function (n) {
+        const preview = (n.content || '').slice(0, 80).replace(/</g, '&lt;');
+        const rem = n.reminder_at
+            ? '<span class="note-rem-badge"><i class="fa-solid fa-bell"></i> ' + formatReminderLabel(n.reminder_at) + '</span>'
+            : '<span class="note-rem-none">Không nhắc</span>';
+        return (
+            '<div class="note-item" data-id="' + n.id + '">' +
+            '<div class="note-item-main" onclick="openNoteEditor(' + n.id + ')">' +
+            '<strong>' + (n.title ? String(n.title).replace(/</g, '&lt;') : 'Không tiêu đề') + '</strong>' +
+            '<span class="note-preview">' + preview + (n.content && n.content.length > 80 ? '…' : '') + '</span>' +
+            rem +
+            '</div>' +
+            '<button type="button" class="note-del" title="Xóa" onclick="deleteNote(' + n.id + ')"><i class="fa-solid fa-trash"></i></button>' +
+            '</div>'
+        );
+    }).join('');
+}
+
+window.openNotesModal = async function () {
+    closeToolsMenu();
+    document.getElementById('toolModalOverlay')?.remove();
+    _notesEditingId = null;
+    const notes = await fetchNotes();
+    const modalHTML = `
+        <div id="toolModalOverlay" class="modal-overlay" onclick="closeToolModal(event)">
+            <div class="tool-modal-card notes-modal-card" onclick="event.stopPropagation()">
+                <button class="close-modal-btn" onclick="closeToolModal()"><i class="fa-solid fa-xmark"></i></button>
+                <h2><i class="fa-solid fa-note-sticky"></i> Ghi chú <small class="notes-count">${notes.length}/${NOTES_MAX}</small></h2>
+                <p class="notes-hint">Ghi <b>ngày</b> (vd: 20/08) + việc (kiểm tra, họp…) để được nhắc trước 30′ và 15′. Ghi chú kiểu “hôm nay học đến bài…” sẽ không nhắc.</p>
+                <div class="notes-list" id="notesList">${renderNotesListHtml(notes)}</div>
+                <button type="button" class="btn-settings primary" style="width:100%;margin-top:8px;" onclick="openNoteEditor(null)">
+                    <i class="fa-solid fa-plus"></i> Tạo ghi chú mới
+                </button>
+            </div>
+        </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.openNoteEditor = async function (id) {
+    let title = '';
+    let content = '';
+    _notesEditingId = id;
+    if (id != null) {
+        if (!_notesCache.length) await fetchNotes();
+        const n = _notesCache.find(function (x) { return String(x.id) === String(id); });
+        if (n) { title = n.title || ''; content = n.content || ''; }
+    } else {
+        if (_notesCache.length >= NOTES_MAX) {
+            showToast('Đã đủ ' + NOTES_MAX + ' tờ ghi chú. Hãy xóa bớt trước khi tạo mới.', 'error');
+            return;
+        }
+    }
+    document.getElementById('toolModalOverlay')?.remove();
+    const wordCount = countWords(content);
+    const modalHTML = `
+        <div id="toolModalOverlay" class="modal-overlay" onclick="closeToolModal(event)">
+            <div class="tool-modal-card notes-modal-card notes-editor-card" onclick="event.stopPropagation()">
+                <button class="close-modal-btn" onclick="openNotesModal()"><i class="fa-solid fa-arrow-left"></i></button>
+                <h2><i class="fa-solid fa-pen"></i> ${id != null ? 'Sửa ghi chú' : 'Ghi chú mới'}</h2>
+                <input type="text" id="noteTitle" class="settings-input" placeholder="Tiêu đề (tùy chọn)" value="">
+                <textarea id="noteContent" class="note-textarea" placeholder="Nội dung…&#10;Ví dụ nhắc nhở: Ngày 20/08 lúc 8h lớp 5A kiểm tra 15 phút Toán&#10;Ví dụ không nhắc: Hôm nay học đến bài Phân số"></textarea>
+                <div class="note-meta-row">
+                    <span id="noteWordCount">${wordCount}/${NOTES_MAX_WORDS} từ</span>
+                    <span id="noteReminderPreview" class="note-rem-preview"></span>
+                </div>
+                <div class="tool-controls">
+                    <button type="button" class="btn-settings primary" onclick="saveNote()"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
+                    <button type="button" class="btn-settings" onclick="openNotesModal()">Hủy</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const titleEl = document.getElementById('noteTitle');
+    const contentEl = document.getElementById('noteContent');
+    if (titleEl) titleEl.value = title;
+    if (contentEl) {
+        contentEl.value = content;
+        contentEl.addEventListener('input', updateNoteEditorMeta);
+    }
+    updateNoteEditorMeta();
+};
+
+function updateNoteEditorMeta() {
+    const content = document.getElementById('noteContent')?.value || '';
+    const wc = countWords(content);
+    const el = document.getElementById('noteWordCount');
+    if (el) {
+        el.textContent = wc + '/' + NOTES_MAX_WORDS + ' từ';
+        el.style.color = wc > NOTES_MAX_WORDS ? '#ef4444' : '';
+    }
+    const rem = parseNoteReminder(content);
+    const prev = document.getElementById('noteReminderPreview');
+    if (prev) {
+        if (rem) prev.innerHTML = '<i class="fa-solid fa-bell"></i> Nhắc: ' + formatReminderLabel(rem);
+        else prev.textContent = 'Không tạo nhắc nhở';
+    }
+}
+
+window.saveNote = async function () {
+    if (!currentUser) return showToast('Cần đăng nhập', 'error');
+    const title = (document.getElementById('noteTitle')?.value || '').trim().slice(0, 120);
+    const content = (document.getElementById('noteContent')?.value || '').trim();
+    if (!content) return showToast('Nội dung không được trống', 'error');
+    const wc = countWords(content);
+    if (wc > NOTES_MAX_WORDS) {
+        showToast('Vượt quá ' + NOTES_MAX_WORDS + ' từ (hiện ' + wc + '). Hãy rút gọn.', 'error');
+        return;
+    }
+    const reminderAt = parseNoteReminder(content);
+    if (_notesEditingId == null) {
+        const current = await fetchNotes();
+        if (current.length >= NOTES_MAX) {
+            showToast('Đã đủ ' + NOTES_MAX + ' tờ ghi chú. Hãy xóa bớt trước khi tạo mới.', 'error');
+            return;
+        }
+        const { error } = await _supabase.from('notes').insert({
+            user_id: currentUser.id,
+            title: title,
+            content: content,
+            reminder_at: reminderAt,
+            notified_30: false,
+            notified_15: false,
+            updated_at: new Date().toISOString()
+        });
+        if (error) return showToast(error.message || 'Lưu thất bại', 'error');
+        showToast(reminderAt ? 'Đã lưu · có nhắc nhở' : 'Đã lưu ghi chú', 'success');
+    } else {
+        const { error } = await _supabase.from('notes').update({
+            title: title,
+            content: content,
+            reminder_at: reminderAt,
+            notified_30: false,
+            notified_15: false,
+            updated_at: new Date().toISOString()
+        }).eq('id', _notesEditingId).eq('user_id', currentUser.id);
+        if (error) return showToast(error.message || 'Cập nhật thất bại', 'error');
+        showToast(reminderAt ? 'Đã cập nhật · có nhắc nhở' : 'Đã cập nhật', 'success');
+    }
+    openNotesModal();
+};
+
+window.deleteNote = async function (id) {
+    if (!await showConfirmModal('Xóa ghi chú này?')) return;
+    const { error } = await _supabase.from('notes').delete().eq('id', id).eq('user_id', currentUser.id);
+    if (error) return showToast(error.message || 'Xóa thất bại', 'error');
+    // Không toast khi xóa thành công — chỉ làm mới danh sách
+    const notes = await fetchNotes();
+    const list = document.getElementById('notesList');
+    const countEl = document.querySelector('.notes-count');
+    if (list) list.innerHTML = renderNotesListHtml(notes);
+    if (countEl) countEl.textContent = notes.length + '/' + NOTES_MAX;
+    // Nếu đang ở màn hình khác, mở lại list
+    if (!list) openNotesModal();
+};
+
+async function checkNoteReminders() {
+    if (!currentUser) return;
+    const now = Date.now();
+    const { data, error } = await _supabase
+        .from('notes')
+        .select('id,title,content,reminder_at,notified_30,notified_15')
+        .eq('user_id', currentUser.id)
+        .not('reminder_at', 'is', null);
+    if (error || !data) return;
+    for (const n of data) {
+        const at = new Date(n.reminder_at).getTime();
+        if (Number.isNaN(at)) continue;
+        const minsLeft = (at - now) / 60000;
+        const label = (n.title || '').trim() || (n.content || '').slice(0, 60);
+        const when = formatReminderLabel(n.reminder_at);
+        if (!n.notified_30 && minsLeft <= 30 && minsLeft > 14) {
+            await createNotification(
+                'Nhắc ghi chú · còn ~30 phút',
+                label + (when ? ' · ' + when : ''),
+                'fa-note-sticky',
+                'note30-' + n.id + '-' + n.reminder_at
+            );
+            await _supabase.from('notes').update({ notified_30: true }).eq('id', n.id).eq('user_id', currentUser.id);
+        }
+        if (!n.notified_15 && minsLeft <= 15 && minsLeft > -2) {
+            await createNotification(
+                'Nhắc ghi chú · còn ~15 phút',
+                label + (when ? ' · ' + when : ''),
+                'fa-note-sticky',
+                'note15-' + n.id + '-' + n.reminder_at
+            );
+            await _supabase.from('notes').update({ notified_15: true }).eq('id', n.id).eq('user_id', currentUser.id);
+        }
+    }
+}
+
+
 window.showAlertModal = function (message) {
     document.getElementById('alertModalOverlay')?.remove();
     const modalHTML = `
@@ -1844,6 +2242,52 @@ window.showAlertModal = function (message) {
 window.closeAlertModal = function (e) {
     if (!e || e.target.id === 'alertModalOverlay' || e.target.tagName === 'BUTTON') {
         document.getElementById('alertModalOverlay')?.remove();
+    }
+};
+
+window.showConfirmModal = function (message) {
+    return new Promise((resolve) => {
+        document.getElementById('confirmModalOverlay')?.remove();
+        
+        let resolved = false;
+        
+        const closeAndResolve = (result) => {
+            if (!resolved) {
+                resolved = true;
+                document.getElementById('confirmModalOverlay')?.remove();
+                resolve(result);
+            }
+        };
+        
+        const modalHTML = `
+            <div id="confirmModalOverlay" class="modal-overlay">
+                <div class="confirm-modal-card">
+                    <div class="confirm-title">${message}</div>
+                    <div class="confirm-buttons">
+                        <button type="button" id="btnConfirmYes" class="btn-confirm-yes">OK</button>
+                        <button type="button" id="btnConfirmNo" class="btn-confirm-no">Huỷ</button>
+                    </div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        const overlay = document.getElementById('confirmModalOverlay');
+        const card = overlay.querySelector('.confirm-modal-card');
+        const yesBtn = document.getElementById('btnConfirmYes');
+        const noBtn = document.getElementById('btnConfirmNo');
+        
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) closeAndResolve(false);
+        });
+        
+        yesBtn.addEventListener('click', () => closeAndResolve(true));
+        noBtn.addEventListener('click', () => closeAndResolve(false));
+    });
+};
+
+window.closeConfirmModal = function (e, result) {
+    if (!e || e.target.id === 'confirmModalOverlay') {
+        document.getElementById('confirmModalOverlay')?.remove();
     }
 };
 
@@ -2062,12 +2506,11 @@ window.exportStudentList = async function () {
 
 // --- INIT APP ---
 document.addEventListener('DOMContentLoaded', async () => {
-    const savedTheme = localStorage.getItem('theme') || 'light';
     if (typeof loadAppearanceSettings === 'function') loadAppearanceSettings();
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    updateThemeUI(savedTheme);
 
     const { data: { session } } = await _supabase.auth.getSession();
+    // Chưa login → sáng; đã login → theme đã lưu
+    applyThemeForAuth(!!session?.user);
     applyUserSession(session?.user || null);
 
     _supabase.auth.onAuthStateChange((event, session) => {
@@ -2136,12 +2579,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     clickAction('btnLogout', async () => {
-        // Đăng xuất → luôn về chế độ sáng (khớp trang login/landing)
-        try {
-            document.documentElement.setAttribute('data-theme', 'light');
-            localStorage.setItem('theme', 'light');
-            if (typeof updateThemeUI === 'function') updateThemeUI('light');
-        } catch (_) {}
+        // Đăng xuất → giao diện sáng, nhưng giữ preference để lần đăng nhập sau
+        try { applyThemeForAuth(false); } catch (_) {}
         await _supabase.auth.signOut();
         window.location.href = 'index.html';
     });
@@ -2193,7 +2632,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             student_number: numberToSave,
             class_id: currentClassId,
             points: 0,
-            is_present: false,
+            is_present: true,
             attendance_date: today,
             phone: phone
         }]).select('id').single();
@@ -2206,7 +2645,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 name,
                 student_number: numberToSave,
                 class_id: currentClassId,
-                is_present: false,
+                is_present: true,
                 attendance_date: today,
                 phone: phone
             }]).select('id').single();
@@ -2224,7 +2663,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await _supabase.from('attendance_logs').upsert({
                     student_id: newStudentId,
                     attendance_date: today,
-                    is_present: false
+                    is_present: true
                 }, { onConflict: 'student_id,attendance_date' });
             } catch (e) { console.warn('attendance_logs on add student:', e); }
         }
@@ -2851,6 +3290,10 @@ function initSettingsPage() {
 
     document.querySelectorAll('[data-theme-set]').forEach(btn => {
         btn.onclick = () => {
+            if (!currentUser) {
+                applyThemeForAuth(false);
+                return;
+            }
             const t = btn.getAttribute('data-theme-set');
             document.documentElement.setAttribute('data-theme', t);
             localStorage.setItem('theme', t);
@@ -2923,7 +3366,7 @@ function initSettingsPage() {
 
     document.getElementById('btnDeleteAccount')?.addEventListener('click', async () => {
         if (!currentUser) return;
-        const ok = confirm('Bạn chắc chắn muốn XÓA TÀI KHOẢN?\n\nToàn bộ lớp, học sinh, điểm, điểm danh, lịch và tài khoản đăng nhập sẽ bị xóa vĩnh viễn trên Supabase.\nHành động không thể hoàn tác.');
+        const ok = await showConfirmModal('Bạn chắc chắn muốn XÓA TÀI KHOẢN?\n\nToàn bộ lớp, học sinh, điểm, điểm danh, lịch và tài khoản đăng nhập sẽ bị xóa vĩnh viễn trên Supabase.\nHành động không thể hoàn tác.');
         if (!ok) return;
         const confirmText = prompt('Nhập "XOA" (viết hoa) để xác nhận:');
         if (confirmText !== 'XOA') return showToast('Đã hủy.', 'info');
@@ -2978,6 +3421,7 @@ function initSettingsPage() {
             }
 
             await _supabase.auth.signOut();
+            try { applyThemeForAuth(false); } catch (_) {}
 
             if (authDeleted) {
                 showToast('Đã xóa toàn bộ dữ liệu và tài khoản trên Supabase.', 'success');
@@ -2994,7 +3438,7 @@ function initSettingsPage() {
     document.getElementById('btnRefreshStats')?.addEventListener('click', loadSettingsStats);
     document.getElementById('btnClearSchedule')?.addEventListener('click', async () => {
         if (!currentUser) return;
-        if (!confirm('Xóa toàn bộ thời khóa biểu (trường + dạy thêm)?')) return;
+        if (!await showConfirmModal('Xóa toàn bộ thời khóa biểu (trường + dạy thêm)?')) return;
         try {
             await _supabase.from('schedule').delete().eq('user_id', currentUser.id);
             showToast('Đã xóa toàn bộ TKB.', 'success');

@@ -318,14 +318,24 @@ async function markAllNotificationsRead() {
 
 async function createNotification(title, message = '', icon = 'fa-bell', sourceKey = null) {
     if (!currentUser) return;
+
+    // Không tạo trùng: cùng source_key hoặc cùng tiêu đề + nội dung trong ngày
+    if (sourceKey) {
+        const { data: existed } = await _supabase
+            .from('notifications')
+            .select('id')
+            .eq('user_id', currentUser.id)
+            .eq('source_key', sourceKey)
+            .limit(1);
+        if (existed && existed.length) return;
+    }
+
     const payload = {
         user_id: currentUser.id,
         title,
         message,
         icon,
         source_key: sourceKey || null,
-        // Ghi thời điểm tạo từ thiết bị theo ISO UTC. Supabase sẽ lưu đúng instant,
-        // sau đó giao diện đổi sang Asia/Ho_Chi_Minh khi hiển thị.
         created_at: new Date().toISOString()
     };
     const { error } = await _supabase.from('notifications').insert(payload);
@@ -641,6 +651,7 @@ window.toggleAttendance = async (studentId, isChecked) => {
     if (!isChecked && student) {
         const stt = student.student_number ? ('#' + student.student_number + ' ') : '';
         const classLabel = currentClassName ? (' · ' + currentClassName) : '';
+        // Một thông báo duy nhất / học sinh / ngày (source_key chống trùng)
         await createNotification(
             'Học sinh vắng mặt',
             stt + (student.name || 'Học sinh') + classLabel,
@@ -2229,14 +2240,16 @@ async function checkNoteReminders() {
 window.showAlertModal = function (message) {
     document.getElementById('alertModalOverlay')?.remove();
     const modalHTML = `
-        <div id="alertModalOverlay" class="modal-overlay" onclick="closeAlertModal(event)">
+        <div id="alertModalOverlay" class="modal-overlay modal-overlay-top" onclick="closeAlertModal(event)">
             <div class="alert-modal-card" onclick="event.stopPropagation()">
                 <div class="alert-icon"><i class="fa-solid fa-bell"></i></div>
-                <div class="alert-title">${message}</div>
+                <div class="alert-title"></div>
                 <button type="button" style="width: 100%; margin-top: 10px;" onclick="closeAlertModal()">Đóng</button>
             </div>
         </div>`;
     document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const titleEl = document.querySelector('#alertModalOverlay .alert-title');
+    if (titleEl) titleEl.textContent = message;
 };
 
 window.closeAlertModal = function (e) {
@@ -2260,9 +2273,9 @@ window.showConfirmModal = function (message) {
         };
         
         const modalHTML = `
-            <div id="confirmModalOverlay" class="modal-overlay">
+            <div id="confirmModalOverlay" class="modal-overlay modal-overlay-top">
                 <div class="confirm-modal-card">
-                    <div class="confirm-title">${message}</div>
+                    <div class="confirm-title"></div>
                     <div class="confirm-buttons">
                         <button type="button" id="btnConfirmYes" class="btn-confirm-yes">OK</button>
                         <button type="button" id="btnConfirmNo" class="btn-confirm-no">Huỷ</button>
@@ -2270,6 +2283,9 @@ window.showConfirmModal = function (message) {
                 </div>
             </div>`;
         document.body.insertAdjacentHTML('beforeend', modalHTML);
+        // Dùng textContent để tránh HTML injection; hỗ trợ xuống dòng
+        const titleEl = document.querySelector('#confirmModalOverlay .confirm-title');
+        if (titleEl) titleEl.textContent = message;
         
         const overlay = document.getElementById('confirmModalOverlay');
         const card = overlay.querySelector('.confirm-modal-card');
@@ -4012,5 +4028,544 @@ window.updateClassTodayBadge = function () {
         document.addEventListener('DOMContentLoaded', run);
     } else {
         run();
+    }
+})();
+// ============================================================
+// SƠ ĐỒ CHỖ NGỒI (VỊ TRÍ LỚP) — kéo thả + lưu Supabase
+// ============================================================
+let _seatingRows = 5;
+let _seatingCols = 6;
+let _seatingMap = {}; // key "r-c" -> studentId (string)
+let _seatingDragStudentId = null;
+let _seatingDragFromCell = null; // "r-c" hoặc null nếu từ pool
+let _seatingSaving = false;
+
+function seatingKey(r, c) {
+    return String(r) + '-' + String(c);
+}
+
+function seatingEscape(value) {
+    return String(value ?? '').replace(/[&<>"']/g, function (ch) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[ch];
+    });
+}
+
+function parseSeatingSize(raw) {
+    const s = String(raw || '').trim().toLowerCase().replace(/×/g, 'x').replace(/\s+/g, '');
+    const m = s.match(/^(\d{1,2})x(\d{1,2})$/);
+    if (!m) return null;
+    const rows = parseInt(m[1], 10);
+    const cols = parseInt(m[2], 10);
+    if (rows < 1 || rows > 20 || cols < 1 || cols > 20) return null;
+    return { rows: rows, cols: cols };
+}
+
+function getAssignedStudentIds() {
+    const set = {};
+    Object.keys(_seatingMap).forEach(function (k) {
+        const id = _seatingMap[k];
+        if (id != null && id !== '') set[String(id)] = true;
+    });
+    return set;
+}
+
+function findStudentById(id) {
+    return (currentStudents || []).find(function (s) {
+        return String(s.id) === String(id);
+    }) || null;
+}
+
+function buildSeatingTooltipHtml(student) {
+    if (!student) return '';
+    const pts = Number(student.points) || 0;
+    const ptsText = pts > 0 ? ('+' + pts) : String(pts);
+    const present = !!student.is_present;
+    return (
+        '<div class="seat-tip-inner">' +
+        '<div class="seat-tip-name"><b>#' + seatingEscape(student.student_number || '') + '</b> ' +
+        seatingEscape(student.name || '') + '</div>' +
+        '<div class="seat-tip-meta">' +
+        '<span class="' + (pts > 0 ? 'pos' : pts < 0 ? 'neg' : '') + '">' + ptsText + ' điểm</span>' +
+        '<span class="seat-tip-dot">·</span>' +
+        '<span class="' + (present ? 'seat-tip-present' : 'seat-tip-absent') + '">' +
+        (present ? 'Có mặt' : 'Vắng') + '</span>' +
+        (student.phone ? ('<span class="seat-tip-dot">·</span><span>' + seatingEscape(student.phone) + '</span>') : '') +
+        '</div></div>'
+    );
+}
+
+function showSeatTooltip(cellEl, student) {
+    hideSeatTooltip();
+    if (!cellEl || !student) return;
+    const tip = document.createElement('div');
+    tip.id = 'seatHoverTip';
+    tip.className = 'seat-hover-tip';
+    tip.innerHTML = buildSeatingTooltipHtml(student);
+    document.body.appendChild(tip);
+
+    const rect = cellEl.getBoundingClientRect();
+    const tipRect = tip.getBoundingClientRect();
+    let left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+    let top = rect.top - tipRect.height - 10;
+    if (top < 8) top = rect.bottom + 10;
+    if (left < 8) left = 8;
+    if (left + tipRect.width > window.innerWidth - 8) {
+        left = window.innerWidth - tipRect.width - 8;
+    }
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+    requestAnimationFrame(function () { tip.classList.add('show'); });
+}
+
+function hideSeatTooltip() {
+    const tip = document.getElementById('seatHoverTip');
+    if (tip) tip.remove();
+}
+
+function pruneSeatingMapToGrid() {
+    const next = {};
+    Object.keys(_seatingMap).forEach(function (k) {
+        const parts = k.split('-');
+        const r = parseInt(parts[0], 10);
+        const c = parseInt(parts[1], 10);
+        if (r >= 0 && r < _seatingRows && c >= 0 && c < _seatingCols && _seatingMap[k] != null) {
+            next[k] = String(_seatingMap[k]);
+        }
+    });
+    _seatingMap = next;
+}
+
+function renderSeatingPool() {
+    const pool = document.getElementById('seatingPoolList');
+    if (!pool) return;
+    const assigned = getAssignedStudentIds();
+    const free = (currentStudents || []).filter(function (s) {
+        return !assigned[String(s.id)];
+    });
+
+    if (!free.length) {
+        pool.innerHTML =
+            '<div class="seating-pool-empty">' +
+            '<i class="fa-solid fa-check-double"></i>' +
+            '<b>Đã xếp hết</b>' +
+            '<span>Mọi học sinh đã có chỗ ngồi.</span></div>';
+        return;
+    }
+
+    pool.innerHTML = free.map(function (s) {
+        return (
+            '<div class="seating-chip" draggable="true" data-student-id="' + seatingEscape(s.id) + '">' +
+            '<span class="seating-chip-stt">#' + seatingEscape(s.student_number || '') + '</span>' +
+            '<span class="seating-chip-name">' + seatingEscape(s.name || '') + '</span>' +
+            '</div>'
+        );
+    }).join('');
+
+    pool.querySelectorAll('.seating-chip').forEach(function (chip) {
+        chip.addEventListener('dragstart', function (e) {
+            _seatingDragStudentId = chip.dataset.studentId;
+            _seatingDragFromCell = null;
+            chip.classList.add('dragging');
+            try {
+                e.dataTransfer.setData('text/plain', chip.dataset.studentId);
+                e.dataTransfer.effectAllowed = 'move';
+            } catch (_) {}
+            hideSeatTooltip();
+        });
+        chip.addEventListener('dragend', function () {
+            chip.classList.remove('dragging');
+            _seatingDragStudentId = null;
+            _seatingDragFromCell = null;
+            document.querySelectorAll('.seat-cell.drag-over').forEach(function (el) {
+                el.classList.remove('drag-over');
+            });
+        });
+    });
+}
+
+function renderSeatingGrid() {
+    const grid = document.getElementById('seatingGrid');
+    if (!grid) return;
+    grid.style.gridTemplateColumns = 'repeat(' + _seatingCols + ', minmax(0, 1fr))';
+    grid.innerHTML = '';
+
+    for (let r = 0; r < _seatingRows; r++) {
+        for (let c = 0; c < _seatingCols; c++) {
+            const key = seatingKey(r, c);
+            const sid = _seatingMap[key];
+            const student = sid ? findStudentById(sid) : null;
+
+            const cell = document.createElement('div');
+            cell.className = 'seat-cell' + (student ? ' filled' : ' empty');
+            cell.dataset.row = String(r);
+            cell.dataset.col = String(c);
+            cell.dataset.key = key;
+
+            if (student) {
+                cell.innerHTML =
+                    '<div class="seat-occupant" draggable="true" data-student-id="' + seatingEscape(student.id) + '">' +
+                    '<span class="seat-stt">#' + seatingEscape(student.student_number || '') + '</span>' +
+                    '<span class="seat-name">' + seatingEscape(student.name || '') + '</span>' +
+                    '</div>';
+                const occ = cell.querySelector('.seat-occupant');
+                occ.addEventListener('dragstart', function (e) {
+                    _seatingDragStudentId = String(student.id);
+                    _seatingDragFromCell = key;
+                    occ.classList.add('dragging');
+                    cell.classList.add('dragging-source');
+                    try {
+                        e.dataTransfer.setData('text/plain', String(student.id));
+                        e.dataTransfer.effectAllowed = 'move';
+                    } catch (_) {}
+                    hideSeatTooltip();
+                });
+                occ.addEventListener('dragend', function () {
+                    occ.classList.remove('dragging');
+                    cell.classList.remove('dragging-source');
+                    _seatingDragStudentId = null;
+                    _seatingDragFromCell = null;
+                    document.querySelectorAll('.seat-cell.drag-over').forEach(function (el) {
+                        el.classList.remove('drag-over');
+                    });
+                });
+                cell.addEventListener('mouseenter', function () {
+                    if (!_seatingDragStudentId) showSeatTooltip(cell, student);
+                });
+                cell.addEventListener('mouseleave', hideSeatTooltip);
+            } else {
+                cell.innerHTML = '<span class="seat-placeholder">' + (r + 1) + '-' + (c + 1) + '</span>';
+            }
+
+            cell.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                try { e.dataTransfer.dropEffect = 'move'; } catch (_) {}
+                cell.classList.add('drag-over');
+            });
+            cell.addEventListener('dragleave', function () {
+                cell.classList.remove('drag-over');
+            });
+            cell.addEventListener('drop', function (e) {
+                e.preventDefault();
+                cell.classList.remove('drag-over');
+                let sidDrop = _seatingDragStudentId;
+                if (!sidDrop) {
+                    try { sidDrop = e.dataTransfer.getData('text/plain'); } catch (_) {}
+                }
+                if (!sidDrop) return;
+                placeStudentOnSeat(String(sidDrop), r, c, _seatingDragFromCell);
+            });
+
+            // Double-click empty? no-op. Double-click filled: return to pool
+            cell.addEventListener('dblclick', function () {
+                if (!student) return;
+                removeStudentFromSeat(key);
+            });
+
+            grid.appendChild(cell);
+        }
+    }
+}
+
+function placeStudentOnSeat(studentId, row, col, fromCellKey) {
+    const targetKey = seatingKey(row, col);
+    const existing = _seatingMap[targetKey];
+
+    // Gỡ khỏi chỗ cũ (nếu kéo từ ô khác)
+    if (fromCellKey && fromCellKey !== targetKey) {
+        delete _seatingMap[fromCellKey];
+    } else {
+        // Gỡ mọi chỗ cũ của học sinh này (kéo từ pool hoặc re-place)
+        Object.keys(_seatingMap).forEach(function (k) {
+            if (String(_seatingMap[k]) === String(studentId)) delete _seatingMap[k];
+        });
+    }
+
+    // Nếu ô đích đang có người khác và đang kéo từ ô khác → hoán đổi
+    if (existing != null && String(existing) !== String(studentId) && fromCellKey) {
+        _seatingMap[fromCellKey] = String(existing);
+    }
+
+    _seatingMap[targetKey] = String(studentId);
+    _seatingDragStudentId = null;
+    _seatingDragFromCell = null;
+    renderSeatingPool();
+    renderSeatingGrid();
+    updateSeatingStatus();
+}
+
+function removeStudentFromSeat(key) {
+    if (_seatingMap[key] != null) {
+        delete _seatingMap[key];
+        renderSeatingPool();
+        renderSeatingGrid();
+        updateSeatingStatus();
+    }
+}
+
+function updateSeatingStatus() {
+    const el = document.getElementById('seatingStatus');
+    if (!el) return;
+    const assigned = Object.keys(getAssignedStudentIds()).length;
+    const total = (currentStudents || []).length;
+    const seats = _seatingRows * _seatingCols;
+    el.textContent = assigned + '/' + total + ' HS đã xếp · ' + seats + ' chỗ (' + _seatingRows + '×' + _seatingCols + ')';
+}
+
+function applySeatingSizeFromInput() {
+    const input = document.getElementById('seatingSizeInput');
+    const parsed = parseSeatingSize(input ? input.value : '');
+    if (!parsed) {
+        showToast('Định dạng: số dọc x số ngang (vd: 5x6, tối đa 20)', 'error');
+        if (input) input.value = _seatingRows + 'x' + _seatingCols;
+        return;
+    }
+    _seatingRows = parsed.rows;
+    _seatingCols = parsed.cols;
+    pruneSeatingMapToGrid();
+    if (input) input.value = _seatingRows + 'x' + _seatingCols;
+    renderSeatingGrid();
+    updateSeatingStatus();
+    showToast('Đã đặt lưới ' + _seatingRows + '×' + _seatingCols, 'success');
+}
+
+async function loadSeatingFromSupabase() {
+    if (!currentUser || !currentClassId) return;
+    const { data, error } = await _supabase
+        .from('class_seating')
+        .select('rows_count, cols_count, layout')
+        .eq('class_id', currentClassId)
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+
+    if (error) {
+        console.warn('load seating:', error.message);
+        // Bảng chưa tạo hoặc lỗi — dùng mặc định
+        return;
+    }
+    if (!data) return;
+
+    const rows = Number(data.rows_count) || 5;
+    const cols = Number(data.cols_count) || 6;
+    _seatingRows = Math.min(20, Math.max(1, rows));
+    _seatingCols = Math.min(20, Math.max(1, cols));
+
+    const layout = data.layout && typeof data.layout === 'object' ? data.layout : {};
+    const validIds = {};
+    (currentStudents || []).forEach(function (s) { validIds[String(s.id)] = true; });
+
+    _seatingMap = {};
+    Object.keys(layout).forEach(function (k) {
+        const parts = String(k).split('-');
+        const r = parseInt(parts[0], 10);
+        const c = parseInt(parts[1], 10);
+        const sid = layout[k];
+        if (
+            !Number.isNaN(r) && !Number.isNaN(c) &&
+            r >= 0 && r < _seatingRows && c >= 0 && c < _seatingCols &&
+            sid != null && validIds[String(sid)]
+        ) {
+            _seatingMap[seatingKey(r, c)] = String(sid);
+        }
+    });
+}
+
+async function saveSeatingToSupabase() {
+    if (!currentUser || !currentClassId) {
+        showToast('Chưa đăng nhập hoặc chưa chọn lớp', 'error');
+        return;
+    }
+    if (_seatingSaving) return;
+    _seatingSaving = true;
+    const btn = document.getElementById('btnSaveSeating');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
+    }
+
+    try {
+        const payload = {
+            class_id: Number(currentClassId),
+            user_id: currentUser.id,
+            rows_count: _seatingRows,
+            cols_count: _seatingCols,
+            layout: _seatingMap,
+            updated_at: new Date().toISOString()
+        };
+
+        const { error } = await _supabase
+            .from('class_seating')
+            .upsert(payload, { onConflict: 'class_id' });
+
+        if (error) {
+            console.error('save seating:', error);
+            showToast('Lưu thất bại: ' + (error.message || 'lỗi Supabase') +
+                '\nHãy chạy SQL tạo bảng class_seating.', 'error');
+            return;
+        }
+        showToast('Đã lưu sơ đồ chỗ ngồi', 'success');
+    } catch (e) {
+        console.error(e);
+        showToast('Lỗi lưu sơ đồ: ' + (e.message || e), 'error');
+    } finally {
+        _seatingSaving = false;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Lưu sơ đồ';
+        }
+    }
+}
+
+window.clearSeatingMap = async function () {
+    if (!await showConfirmModal(
+        'Bỏ hết chỗ ngồi đã xếp của học sinh?\n\n' +
+        'Chỉ xóa trên màn hình này.\n' +
+        'Muốn lưu thay đổi lên tài khoản, hãy bấm «Lưu sơ đồ» sau.'
+    )) return;
+    _seatingMap = {};
+    renderSeatingPool();
+    renderSeatingGrid();
+    updateSeatingStatus();
+    showToast('Đã bỏ hết chỗ xếp trên màn hình. Bấm Lưu sơ đồ nếu muốn ghi lại.', 'info');
+};
+
+window.closeSeatingModal = function (event) {
+    if (event && event.target && event.target.id !== 'seatingModalOverlay') return;
+    hideSeatTooltip();
+    document.getElementById('seatingModalOverlay')?.remove();
+};
+
+window.openSeatingModal = async function () {
+    if (!currentClassId) {
+        showToast('Hãy vào một lớp trước', 'error');
+        return;
+    }
+    if (!currentStudents || !currentStudents.length) {
+        showToast('Lớp chưa có học sinh', 'error');
+        return;
+    }
+
+    // Mặc định lưới gọn theo sĩ số
+    const n = currentStudents.length;
+    if (!_seatingRows || !_seatingCols) {
+        _seatingCols = Math.min(8, Math.max(4, Math.ceil(Math.sqrt(n))));
+        _seatingRows = Math.min(12, Math.max(3, Math.ceil(n / _seatingCols)));
+    }
+
+    await loadSeatingFromSupabase();
+
+    document.getElementById('seatingModalOverlay')?.remove();
+    hideSeatTooltip();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'seatingModalOverlay';
+    overlay.className = 'modal-overlay seating-overlay';
+    overlay.onclick = function (e) {
+        if (e.target === overlay) closeSeatingModal(e);
+    };
+
+    overlay.innerHTML =
+        '<div class="seating-modal-card" role="dialog" aria-modal="true" aria-label="Sơ đồ vị trí lớp">' +
+        '  <button type="button" class="close-modal-btn" id="seatingCloseBtn" aria-label="Đóng">&times;</button>' +
+        '  <div class="seating-modal-head">' +
+        '    <div>' +
+        '      <h2><i class="fa-solid fa-chair"></i> Vị trí lớp</h2>' +
+        '      <p class="seating-modal-sub">' + seatingEscape(currentClassName || '') +
+        ' · Khối ' + seatingEscape(currentClassGrade) + '</p>' +
+        '    </div>' +
+        '    <div class="seating-head-actions">' +
+        '      <span id="seatingStatus" class="seating-status"></span>' +
+        '      <button type="button" class="btn-settings" id="btnClearSeating"><i class="fa-solid fa-eraser"></i> Xóa xếp</button>' +
+        '      <button type="button" class="btn-settings primary" id="btnSaveSeating"><i class="fa-solid fa-floppy-disk"></i> Lưu sơ đồ</button>' +
+        '    </div>' +
+        '  </div>' +
+        '  <div class="seating-body">' +
+        '    <aside class="seating-pool">' +
+        '      <div class="seating-pool-head">' +
+        '        <label for="seatingSizeInput"><i class="fa-solid fa-table-cells"></i> Lưới chỗ</label>' +
+        '        <div class="seating-size-row">' +
+        '          <input type="text" id="seatingSizeInput" class="seating-size-input" placeholder="dọc x ngang" maxlength="7" title="Số chỗ dọc × số chỗ ngang, vd 5x6">' +
+        '          <button type="button" id="btnApplySeatingSize" class="btn-settings">Áp dụng</button>' +
+        '        </div>' +
+        '        <p class="seating-size-hint">Định dạng: <b>số dọc x số ngang</b> (vd 5x6). Tối đa 20×20.</p>' +
+        '      </div>' +
+        '      <div class="seating-pool-title"><i class="fa-solid fa-users"></i> Chưa xếp chỗ</div>' +
+        '      <div id="seatingPoolList" class="seating-pool-list"></div>' +
+        '      <p class="seating-pool-hint">Kéo thẻ sang ô bên phải. Nháy đúp ô đã xếp để trả về danh sách.</p>' +
+        '    </aside>' +
+        '    <section class="seating-canvas">' +
+        '      <div class="seating-board" title="Hướng bảng lớp (phía giáo viên)">' +
+        '        <i class="fa-solid fa-chalkboard"></i> BẢNG LỚP' +
+        '      </div>' +
+        '      <div class="seating-grid-wrap">' +
+        '        <div id="seatingGrid" class="seating-grid"></div>' +
+        '      </div>' +
+        '      <div class="seating-legend">' +
+        '        <span><i class="fa-solid fa-arrow-up"></i> Phía bảng</span>' +
+        '        <span>Kéo thả để xếp · Hover ô để xem chi tiết</span>' +
+        '      </div>' +
+        '    </section>' +
+        '  </div>' +
+        '</div>';
+
+    document.body.appendChild(overlay);
+
+    const sizeInput = document.getElementById('seatingSizeInput');
+    if (sizeInput) sizeInput.value = _seatingRows + 'x' + _seatingCols;
+
+    document.getElementById('seatingCloseBtn')?.addEventListener('click', function () {
+        closeSeatingModal();
+    });
+    document.getElementById('btnApplySeatingSize')?.addEventListener('click', applySeatingSizeFromInput);
+    sizeInput?.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            applySeatingSizeFromInput();
+        }
+    });
+    document.getElementById('btnSaveSeating')?.addEventListener('click', saveSeatingToSupabase);
+    document.getElementById('btnClearSeating')?.addEventListener('click', function () {
+        clearSeatingMap();
+    });
+
+    // Cho phép thả lại vào pool để gỡ chỗ
+    const poolList = document.getElementById('seatingPoolList');
+    if (poolList) {
+        poolList.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            poolList.classList.add('pool-drag-over');
+        });
+        poolList.addEventListener('dragleave', function () {
+            poolList.classList.remove('pool-drag-over');
+        });
+        poolList.addEventListener('drop', function (e) {
+            e.preventDefault();
+            poolList.classList.remove('pool-drag-over');
+            if (_seatingDragFromCell) {
+                removeStudentFromSeat(_seatingDragFromCell);
+            }
+            _seatingDragStudentId = null;
+            _seatingDragFromCell = null;
+        });
+    }
+
+    renderSeatingPool();
+    renderSeatingGrid();
+    updateSeatingStatus();
+};
+
+(function bindSeatingButton() {
+    function bind() {
+        const btn = document.getElementById('btnOpenSeating');
+        if (btn && !btn.dataset.seatingBound) {
+            btn.dataset.seatingBound = '1';
+            btn.addEventListener('click', function () {
+                openSeatingModal();
+            });
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bind);
+    } else {
+        bind();
     }
 })();
